@@ -1,0 +1,30 @@
+﻿# --- Django (المنظومة) ---
+*.pyc
+__pycache__/
+db.sqlite3
+.venv/
+env/
+venv/
+*.log
+media/
+
+# --- Flutter (التطبيق) ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+android/.gradle
+ios/.symlinks
+ios/Pods/
+.pub-cache/
+.pub/
+pubspec.lock
+
+# --- System ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+reveal_dashboard/reveal_dashboard/firebase-credentials.json
