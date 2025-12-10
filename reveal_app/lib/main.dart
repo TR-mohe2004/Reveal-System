@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart'; 
 import 'package:reveal_app/app/data/providers/auth_provider.dart';
 import 'package:reveal_app/app/data/providers/cart_provider.dart';
 import 'package:reveal_app/app/data/providers/product_provider.dart';
@@ -14,13 +15,25 @@ import 'package:reveal_app/app/presentation/screens/main_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
+  // 1. ضمان تهيئة بيئة Flutter أولاً
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  // 2. محاولة تهيئة Firebase مع التقاط الأخطاء لمنع الانهيار
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    debugPrint("✅ Firebase Initialized Successfully");
+  } catch (e) {
+    debugPrint("❌ Firebase Initialization Error: $e");
+    // التطبيق سيستمر في العمل حتى لو فشل الفايربيس (لأغراض العرض)
+  }
+  
+  // 3. تشغيل التطبيق
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -37,16 +50,25 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.teal,
-          scaffoldBackgroundColor: Colors.white,
-          fontFamily: 'GoogleFonts', 
+          scaffoldBackgroundColor: const Color(0xFFF9F9F9),
+          // إعداد الخطوط بشكل صحيح
+          textTheme: GoogleFonts.cairoTextTheme(Theme.of(context).textTheme),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: IconThemeData(color: Colors.black),
+            titleTextStyle: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
         ),
+        // تعريف المسارات
         routes: {
           '/welcome': (context) => const WelcomeScreen(),
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignupScreen(),
           '/main': (context) => const MainScreen(),
         },
-        home: const WelcomeScreen(), // البداية دائماً من الترحيب
+        // الصفحة الأولى
+        home: const WelcomeScreen(), 
       ),
     );
   }

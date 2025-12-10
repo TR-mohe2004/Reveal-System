@@ -1,40 +1,50 @@
 // lib/app/data/models/wallet_model.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Wallet: يمثل نموذج البيانات (Data Model) للمحفظة.
-/// هذا الكلاس يحدد شكل بيانات المحفظة وكيفية قراءتها من Firestore.
 class Wallet {
-  final String id;          // معرف المحفظة الفريد (Document ID)
+  final int id;             // معرف المحفظة
   final double balance;     // الرصيد الحالي
-  final String collegeId;   // معرف الكلية التي تتبعها المحفظة
-  final String linkCode;    // كود الربط الذي يستخدمه الطالب
+  final String currency;    // العملة
+  final String college;     // اسم الكلية (الجديد)
+  final String linkCode;    // كود الربط (الجديد)
+  final String lastUpdate;  // تاريخ آخر تحديث
 
   Wallet({
     required this.id,
     required this.balance,
-    required this.collegeId,
+    required this.currency,
+    required this.college,
     required this.linkCode,
+    required this.lastUpdate,
   });
 
-  /// دالة مصنعية (Factory Constructor) لتحويل مستند Firestore إلى كائن Wallet.
-  factory Wallet.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
+  /// دالة تحويل JSON القادم من الباك اند إلى كائن Wallet
+  factory Wallet.fromJson(Map<String, dynamic> json) {
     return Wallet(
-      id: doc.id,
-      balance: (data['balance'] ?? 0).toDouble(),
-      collegeId: data['collegeId'] ?? '',
-      linkCode: data['linkCode'] ?? '',
+      // استخدام (?? 0) لتجنب الخطأ لو كانت القيمة null
+      id: json['id'] ?? 0,
+      
+      // تحويل آمن للرقم سواء جاء نصاً أو رقماً
+      balance: double.tryParse(json['balance'].toString()) ?? 0.00,
+      
+      currency: json['currency'] ?? 'د.ل',
+      
+      // الحقول الجديدة التي أضفناها في المنظومة
+      college: json['college']?.toString() ?? 'غير محدد',
+      linkCode: json['link_code']?.toString() ?? '---',
+      
+      // تاريخ التحديث (اختياري)
+      lastUpdate: json['updated_at']?.toString() ?? '',
     );
   }
 
-  /// دالة مصنعية لتحويل JSON من Django API
-  factory Wallet.fromJson(Map<String, dynamic> json) {
-    return Wallet(
-      id: json['id']?.toString() ?? '',
-      balance: double.tryParse(json['balance'].toString()) ?? 0.0,
-      collegeId: json['college']?.toString() ?? '',
-      linkCode: json['link_code'] ?? '',
-    );
+  /// دالة لتحويل الكائن إلى JSON (للاستخدام المستقبلي إذا احتجنا إرساله)
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'balance': balance,
+      'currency': currency,
+      'college': college,
+      'link_code': linkCode,
+    };
   }
 }

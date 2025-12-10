@@ -86,23 +86,24 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 20),
 
-              // 4. التصنيفات (الأيقونات الدائرية) - ميني همبرغر وغيرها
+              // 4. التصنيفات (صور حقيقية بدلاً من الأيقونات)
               SizedBox(
-                height: 90,
+                height: 110, // زيادة الارتفاع قليلاً لاستيعاب الصور والنص
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   reverse: true, // لتبدأ من اليمين
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   children: [
-                    _buildCategoryItem("مشروبات", Icons.coffee),
-                    _buildCategoryItem("سندويتش", Icons.lunch_dining),
-                    _buildCategoryItem("أكل صحي", Icons.health_and_safety),
-                    _buildCategoryItem("برجر", Icons.fastfood),
+                    _buildCategoryItem("مشروبات", "assets/images/drinks.png"),
+                    _buildCategoryItem("حلى", "assets/images/dessert.png"), // استبدال أكل صحي بـ حلى
+                    _buildCategoryItem("بيتزا", "assets/images/pizza.png"), // استبدال سندويتش بـ بيتزا
+                    _buildCategoryItem("برجر", "assets/images/burger.png"),
                   ],
                 ),
               ),
               const SizedBox(height: 10),
 
-              // 5. الفلاتر (الأسعار، التقييم...) - باللون التركوازي
+              // 5. الفلاتر
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 reverse: true,
@@ -130,18 +131,51 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 10),
 
-              // 7. قائمة المنتجات (Restaurant Cards) الحية
+              // 7. قائمة المنتجات
               Consumer<ProductProvider>(
                 builder: (context, provider, child) {
-                  if (provider.products.isEmpty) {
-                    return const Center(child: Text("لا توجد منتجات حالياً"));
-                  }
+                  // استخدام بيانات وهمية للعرض إذا كانت القائمة فارغة (مؤقتاً للتحقق من التصميم)
+                  final displayProducts = provider.products.isNotEmpty 
+                      ? provider.products 
+                      : [
+                          Product(
+                            id: "1", 
+                            name: "اسم الكافيتيريا - المنطقة والعنوان", 
+                            price: 0.0, 
+                            imageUrl: "", // سيتم استخدام الأيقونة الافتراضية
+                            description: "عدد الأصناف المتوفرة: 255 صنف",
+                            category: "مطعم",
+                            collegeId: "1",
+                            collegeName: "جامعة طرابلس",
+                          ),
+                          Product(
+                            id: "2", 
+                            name: "مطعم الجامعة الرئيسي", 
+                            price: 0.0, 
+                            imageUrl: "", 
+                            description: "شاورما، برجر، ومشروبات",
+                            category: "مطعم",
+                            collegeId: "1",
+                            collegeName: "جامعة طرابلس",
+                          ),
+                          Product(
+                            id: "3", 
+                            name: "كافيتيريا العلوم", 
+                            price: 0.0, 
+                            imageUrl: "", 
+                            description: "سندويتشات وقهوة",
+                            category: "كافيتيريا",
+                            collegeId: "2",
+                            collegeName: "كلية العلوم",
+                          ),
+                        ];
+
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: provider.products.length,
+                    itemCount: displayProducts.length,
                     itemBuilder: (context, index) {
-                      return RestaurantCard(product: provider.products[index]);
+                      return RestaurantCard(product: displayProducts[index]);
                     },
                   );
                 },
@@ -153,18 +187,40 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryItem(String title, IconData icon) {
+  // تعديل لبناء العنصر باستخدام صورة بدلاً من أيقونة
+  Widget _buildCategoryItem(String title, String imagePath) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Colors.grey[200],
-            child: Icon(icon, color: Colors.black54),
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFCE4EC), // خلفية فاتحة مشابهة للصورة
+              borderRadius: BorderRadius.circular(20), // تدوير الحواف ليصبح مربع بحواف دائرية كما في الصورة
+              image: DecorationImage(
+                image: AssetImage(imagePath),
+                fit: BoxFit.cover,
+              ),
+               boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  blurRadius: 5,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 5),
-          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(
+            title, 
+            style: const TextStyle(
+              fontSize: 14, 
+              fontWeight: FontWeight.bold,
+              color: Colors.black87
+            )
+          ),
         ],
       ),
     );
@@ -175,16 +231,16 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(right: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isSelected ? const Color(0xFF2DBA9D) : Colors.white, // تلوين الخلفية عند التحديد
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: isSelected ? const Color(0xFF2DBA9D) : Colors.grey[300]!),
       ),
       child: Row(
         children: [
-          Text(label, style: TextStyle(color: isSelected ? const Color(0xFF2DBA9D) : Colors.black)),
+          Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.black)), // النص أبيض عند التحديد
           if (isSelected) ...[
             const SizedBox(width: 5),
-            const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF2DBA9D))
+            const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white)
           ]
         ],
       ),
@@ -192,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ✨✨✨ Restaurant Card (التصميم الرمادي الأصلي) ✨✨✨
+// ✨✨✨ Restaurant Card ✨✨✨
 class RestaurantCard extends StatelessWidget {
   final Product product;
   const RestaurantCard({super.key, required this.product});
@@ -200,12 +256,12 @@ class RestaurantCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 5, spreadRadius: 1),
+          BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -214,46 +270,49 @@ class RestaurantCard extends StatelessWidget {
           Stack(
             children: [
               Container(
-                height: 140,
+                height: 160,
                 decoration: const BoxDecoration(
-                  color: Colors.grey, // لون رمادي كما في الصورة الأصلية
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+                  color: Colors.grey, 
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: product.imageUrl.isNotEmpty
-                    ? Image.network(
-                        product.imageUrl,
-                        width: double.infinity,
-                        height: 140,
-                        fit: BoxFit.cover,
-                        errorBuilder: (c,o,s) => const Center(child: Icon(Icons.image, size: 50, color: Colors.white)),
+                    ? ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        child: Image.network(
+                          product.imageUrl,
+                          width: double.infinity,
+                          height: 160,
+                          fit: BoxFit.cover,
+                          errorBuilder: (c,o,s) => const Center(child: Icon(Icons.image, size: 50, color: Colors.white)),
+                        ),
                       )
                     : const Center(child: Icon(Icons.image, size: 50, color: Colors.white)),
               ),
               // أيقونة القلب
               Positioned(
-                top: 10,
-                left: 10,
+                top: 15,
+                left: 15,
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(8),
                   decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                  child: const Icon(Icons.favorite_border, size: 18),
+                  child: const Icon(Icons.favorite_border, size: 20, color: Colors.black54),
                 ),
               ),
               // التقييم (الزاوية اليمنى السفلية)
               Positioned(
-                bottom: 10,
-                right: 10,
+                bottom: 15,
+                right: 15,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Row(
                     children: [
-                      Text("0.0 (عدد المقيمين)", style: TextStyle(color: Colors.white, fontSize: 10)),
+                      Text("0.0 (عدد المقيمين)", style: TextStyle(color: Colors.white, fontSize: 11)),
                       SizedBox(width: 4),
-                      Icon(Icons.star, color: Colors.orange, size: 12),
+                      Icon(Icons.star, color: Colors.orange, size: 14),
                     ],
                   ),
                 ),
@@ -263,22 +322,21 @@ class RestaurantCard extends StatelessWidget {
           
           // البيانات (الاسم والسعر)
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end, // محاذاة لليمين
               children: [
                 Text(
-                  product.name, // اسم المنتج أو الكافيتيريا
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  product.name, 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   textDirection: TextDirection.rtl,
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 8),
                 Text(
-                  "سعر المنتج: ${product.price} دينار | عدد الأصناف المتوفرة: 255",
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  product.price > 0 ? "سعر المنتج: ${product.price} دينار" : "سعر التوصيل: 00 دينار | ${product.description}",
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
                   textDirection: TextDirection.rtl,
                 ),
-                Divider(color: Colors.grey[300]),
               ],
             ),
           ),

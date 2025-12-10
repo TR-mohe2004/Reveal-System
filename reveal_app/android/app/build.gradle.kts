@@ -2,10 +2,12 @@
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services") // إضافة إضافة فايربيس
 }
 
 android {
-    namespace = "com.example.reveal_app"
+    //  تم تحديث الاسم ليطابق ملف json
+    namespace = "edu.zliten.university.reveal_app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -23,7 +25,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.reveal_app"
+        //  تم تحديث المعرف ليطابق ملف json
+        applicationId = "edu.zliten.university.reveal_app"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode

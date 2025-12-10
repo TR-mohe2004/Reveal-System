@@ -6,8 +6,8 @@ import 'package:reveal_app/app/data/models/product_model.dart';
 import 'package:reveal_app/app/data/models/wallet_model.dart'; 
 
 class ApiService {
-  // ✅ تم وضع رقم الـ IP الخاص بجهازك هنا
-  static const String _laptopIp = "192.168.117.200"; 
+  // ✅✅✅ تم تحديث الـ IP للرقم الجديد الذي أرسلته ✅✅✅
+  static const String _laptopIp = "192.168.122.98"; 
 
   // تحديد الرابط تلقائياً حسب الجهاز المستخدم
   static String get baseUrl {
@@ -133,7 +133,7 @@ class ApiService {
     }
   }
 
-  // ✅ دالة جلب المحفظة (التي كانت ناقصة وتسبب الخطأ)
+  // دالة جلب المحفظة
   Future<Wallet?> getWallet() async {
     final url = Uri.parse('$baseUrl/api/wallet/');
     try {

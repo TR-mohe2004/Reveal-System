@@ -6,13 +6,15 @@ from firebase_admin import credentials
 # تحديد المسار الأساسي للمشروع
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# مفتاح الأمان (يجب تغييره عند الرفع على استضافة حقيقية)
+# --- إعدادات الأمان (مهمة للاستضافة) ---
+
+# مفتاح الأمان: يفضل تغييره بمتغير بيئة عند النشر النهائي، لكن لا بأس به الآن
 SECRET_KEY = 'django-insecure-your-secret-key-change-me'
 
-# وضع التصحيح (True للتطوير، False للنشر)
+# وضع التصحيح: نجعله True للتطوير، ويمكن تغييره لـ False عند النشر النهائي لإخفاء الأخطاء عن المستخدمين
 DEBUG = True
 
-# السماح لجميع الاستضافات (مفيد للتجربة مع فلاتر)
+# السماح لجميع الاستضافات (الآن يقبل Localhost و PythonAnywhere وأي دومين)
 ALLOWED_HOSTS = ['*']
 
 # --- التطبيقات المثبتة ---
@@ -24,14 +26,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # --- مكتبات الطرف الثالث (لربط فلاتر) ---
+    # --- مكتبات الطرف الثالث ---
     'rest_framework',  # لإنشاء الـ API
-    'corsheaders',     # للسماح لتطبيق فلاتر بالاتصال بالسيرفر
+    'rest_framework.authtoken', # مهم جداً: لإدارة التوكنات (Login/Signup)
+    'corsheaders',     # للسماح لتطبيق فلاتر بالاتصال
 
     # --- تطبيقاتنا الخاصة ---
-    'core.apps.CoreConfig',   # التطبيق الأساسي
-    'users.apps.UsersConfig', # تطبيق المستخدمين (تم تفعيله الآن)
-    'wallet.apps.WalletConfig', # تطبيق المحفظة (تم تفعيله الآن)
+    'core.apps.CoreConfig',   
+    'users.apps.UsersConfig', 
+    'wallet.apps.WalletConfig', 
 ]
 
 # --- الوسائط (Middleware) ---
@@ -52,8 +55,8 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'], # مجلد القوالب الرئيسي
-        'APP_DIRS': True, # البحث داخل مجلدات التطبيقات
+        'DIRS': [BASE_DIR / 'templates'], 
+        'APP_DIRS': True, 
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -75,8 +78,7 @@ DATABASES = {
     }
 }
 
-# --- إعداد مودل المستخدم المخصص (مهم جداً) ---
-# يخبر دجانغو باستخدام جدول المستخدمين الموجود في تطبيق users
+# --- إعداد مودل المستخدم المخصص ---
 AUTH_USER_MODEL = 'users.User'
 
 # --- مدققات كلمة المرور ---
@@ -94,11 +96,11 @@ USE_I18N = True
 USE_TZ = True
 
 # --- الملفات الثابتة (Static & Media) ---
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
-# أين سيجمع دجانغو الملفات عند النشر
+# هذه الإعدادات ضرورية جداً لظهور الصور والتنسيقات في الاستضافة
+
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / "static"]
+# هذا المسار الذي ستستخدمه الاستضافة لتجميع الملفات (أمر collectstatic)
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = '/media/'
@@ -107,37 +109,40 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- إعدادات CORS (للسماح لتطبيق فلاتر بالاتصال) ---
-CORS_ALLOW_ALL_ORIGINS = True # نسمح للجميع أثناء التطوير
+CORS_ALLOW_ALL_ORIGINS = True 
+CORS_ALLOW_CREDENTIALS = True
 
 # --- إعدادات REST Framework ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.TokenAuthentication', # للتطبيق (موبايل)
+        'rest_framework.authentication.SessionAuthentication', # للمتصفح (Dashboard)
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.AllowAny', # افتراضياً مسموح للكل (يمكن تقييده في Views)
     ],
 }
 
 # --- إعدادات Firebase ---
-FIREBASE_CREDS_PATH = os.path.join(BASE_DIR, 'firebase-credentials.json')
+# استخدام مسار مرن يعمل على ويندوز ولينكس (الاستضافة)
+FIREBASE_CREDS_PATH = BASE_DIR / 'firebase-credentials.json'
 
-# تهيئة Firebase Admin SDK (مرة واحدة فقط)
+# تهيئة Firebase Admin SDK
 if not firebase_admin._apps:
     try:
         if os.path.exists(FIREBASE_CREDS_PATH):
-            cred = credentials.Certificate(FIREBASE_CREDS_PATH)
+            cred = credentials.Certificate(str(FIREBASE_CREDS_PATH))
             firebase_admin.initialize_app(cred, {
                 'storageBucket': 'revealapp-8af3f.appspot.com'
             })
             print("✅ Firebase Admin SDK Initialized successfully!")
         else:
-            print("⚠️ Warning: firebase-credentials.json not found.")
+            # رسالة تحذيرية في الكونسول إذا لم يجد الملف
+            print(f"⚠️ Warning: firebase-credentials.json not found at {FIREBASE_CREDS_PATH}")
     except Exception as e:
-        print(f"❌ CRITICAL: Error initializing Firebase Admin App: {e}")
+        print(f"❌ Error initializing Firebase: {e}")
 
-# إعدادات Pyrebase (للاستخدام في الواجهات الأمامية للدجانغو إن لزم الأمر)
+# إعدادات Pyrebase (للواجهة الأمامية إن لزمت)
 PYREBASE_CONFIG = {
     "apiKey": "AIzaSyCSCPWbtxmXJzTwGwj4OZDba3r3JaCuAlU",
     "authDomain": "revealapp-8af3f.firebaseapp.com",
@@ -148,7 +153,7 @@ PYREBASE_CONFIG = {
     "databaseURL": ""
 }
 
-# رابط تسجيل الدخول الافتراضي
+# توجيهات تسجيل الدخول
 LOGIN_URL = 'core:login'
-LOGIN_REDIRECT_URL = '/' 
-LOGOUT_REDIRECT_URL = '/login/'
+LOGIN_REDIRECT_URL = 'core:dashboard' # تم التعديل ليوجه للداشبورد مباشرة
+LOGOUT_REDIRECT_URL = 'core:login'
