@@ -135,9 +135,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
+                                  const Text(
                                     '+218', 
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)
                                   ),
                                   const SizedBox(width: 8),
                                   // مكان العلم - صورة دائرية

@@ -205,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
                boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   blurRadius: 5,
                   offset: const Offset(0, 3),
                 ),
@@ -261,7 +261,7 @@ class RestaurantCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.grey.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -305,7 +305,7 @@ class RestaurantCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
+                    color: Colors.black.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Row(

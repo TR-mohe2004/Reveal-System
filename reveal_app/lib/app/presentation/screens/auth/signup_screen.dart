@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/providers/auth_provider.dart';
@@ -11,134 +10,217 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  // متغيرات للتحكم في حقول الإدخال
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-
-  // متغيرات لإدارة الحالة
-  bool _isPasswordVisible = false;
-  bool _agreedToTerms = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  // دالة التسجيل المعدلة
-  void _onSignupPressed() async {
-    // التحقق من صحة النموذج أولاً
-    if (_formKey.currentState!.validate()) {
-      // التحقق من الموافقة على الشروط
-      if (!_agreedToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('الرجاء الموافقة على شروط وقواعد الإستخدام'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      
-      // إغلاق الكيبورد
-      FocusScope.of(context).unfocus();
+  Future<void> _handleSignup() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    FocusScope.of(context).unfocus();
 
-      // إظهار دائرة تحميل
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (c) => const Center(child: CircularProgressIndicator()),
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final success = await authProvider.signup(
+      _nameController.text.trim(),
+      _phoneController.text.trim(),
+      _passwordController.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/link-wallet', (route) => false);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage ?? 'فشل في إنشاء الحساب. حاول مرة أخرى.'),
+          backgroundColor: Colors.red,
+        ),
       );
-
-      // محاولة إنشاء الحساب
-      // نرسل رقم هاتف افتراضي '0000000000' لأن الباك اند يطلبه، لكننا لم نضعه في الواجهة بعد
-      final success = await authProvider.signup(
-        _nameController.text.trim(),
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-         
-      );
-
-      Navigator.pop(context); // إغلاق دائرة التحميل
-
-      if (success) {
-        // الانتقال إلى الشاشة الرئيسية
-        Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
-            content: Text(authProvider.errorMessage ?? 'فشل إنشاء الحساب'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // باقي الكود (build) كما هو تماماً في رسالتك...
-    // سأختصره هنا لعدم التكرار، انسخ الجزء العلوي فقط واستبدله في ملفك
-    // واحتفظ بباقي التصميم (buildTextField, buildEmailField...) كما هو.
-    
-    // ... (نفس كود التصميم الذي أرسلته لي) ...
-    
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Directionality(
-          textDirection: TextDirection.rtl,
+    final isLoading = context.watch<AuthProvider>().status == AuthStatus.authenticating;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   // ... (نفس محتوى العمود الذي أرسلته)
-                   // 1. زر الرجوع
-                   Align(
+                  Align(
                     alignment: Alignment.topLeft,
-                    child: IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.rectangle,
-                          border: Border.all(color: Colors.grey.shade400, width: 1.5),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.arrow_forward_ios, size: 18),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.black, width: 2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      onPressed: () => Navigator.of(context).pop(),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_forward_ios, size: 20, color: Colors.black),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  const Center(
+                    child: Text(
+                      "انشاء حساب جديد",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Center(
+                    child: Text(
+                      "قم بملئ الفراغات التالية:",
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildLabel("الإسم واللقب"),
+                  _buildTextField(
+                    controller: _nameController,
+                    hintText: "أدخل الإسم واللقب",
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'الرجاء إدخال الاسم واللقب';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _buildLabel("رقم الهاتف"),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    textDirection: TextDirection.ltr,
+                    textAlign: TextAlign.left,
+                    decoration: _buildInputDecoration(
+                      hintText: "أدخل رقم الهاتف",
+                      suffixIcon: const Padding(
+                        padding: EdgeInsets.only(left: 10, right: 15),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text("218+", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                            SizedBox(width: 8),
+                            Text("🇱🇾", style: TextStyle(fontSize: 24)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'الرجاء إدخال رقم الهاتف';
+                      }
+                      if (value.length < 9) {
+                        return 'يجب أن يكون رقم الهاتف 9 أرقام على الأقل';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _buildLabel("كلمة السر"),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: _buildInputDecoration(
+                      hintText: "أدخل كلمة السر",
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          color: Colors.grey,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'الرجاء إدخال كلمة السر';
+                      }
+                      if (value.length < 6) {
+                        return 'يجب أن تكون كلمة السر 6 أحرف على الأقل';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 15),
+                  const Center(
+                    child: Text(
+                      "عن طريق المتابعة، أنا أوافق على شروط وقواعد الإستخدام",
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _handleSignup,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF26A69A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "إنشاء الحساب",
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text("أو إستخدام حساب جوجل", style: TextStyle(color: Colors.grey[600])),
+                      ),
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Image.network(
+                      'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
+                      height: 40,
                     ),
                   ),
                   const SizedBox(height: 40),
-
-                  // 2. العنوان
-                  const Text(
-                    'إنشاء حساب جديد',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                  ),
-                  // ... إلخ (باقي الكود كما هو)
-                  
-                  // عند الزر، تأكد أنه يستدعي _onSignupPressed التي عدلناها في الأعلى
-                  ElevatedButton(
-                    onPressed: _onSignupPressed,
-                    // ... الستايل كما هو
-                    child: const Text(
-                      'إنشاء الحساب',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                  ),
-                  
-                  // ... باقي الكود
                 ],
               ),
             ),
@@ -148,159 +230,40 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // ... (باقي الودجات المساعدة كما هي)
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0, right: 10),
+      child: Text(
+        text,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+    );
+  }
+
   Widget _buildTextField({
-    required String label,
     required TextEditingController controller,
-    required String hint,
-    String? Function(String?)? validator,
+    required String hintText,
+    required String? Function(String?) validator,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            fillColor: Colors.grey[100],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          validator: validator,
-        ),
-      ],
+    return TextFormField(
+      controller: controller,
+      decoration: _buildInputDecoration(hintText: hintText),
+      validator: validator,
     );
   }
 
-  Widget _buildEmailField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('البريد الإلكتروني', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            hintText: 'أدخل البريد الإلكتروني',
-            filled: true,
-            fillColor: Colors.grey[100],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
-              borderSide: BorderSide.none,
-            ),
-            prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'الرجاء إدخال البريد الإلكتروني';
-            }
-            if (!value.contains('@')) {
-              return 'عنوان البريد الإلكتروني غير صحيح';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPasswordField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('كلمة السر', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _passwordController,
-          obscureText: !_isPasswordVisible,
-          decoration: InputDecoration(
-            hintText: 'أدخل كلمة السر',
-            filled: true,
-            fillColor: Colors.grey[100],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
-              borderSide: BorderSide.none,
-            ),
-            prefixIcon: IconButton(
-              icon: Icon(
-                _isPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                color: Colors.grey,
-              ),
-              onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'الرجاء إدخال كلمة السر';
-            }
-            if (value.length < 8) {
-              return 'يجب أن تكون كلمة السر 8 أحرف على الأقل';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTermsAndConditions() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Checkbox(
-          value: _agreedToTerms,
-          onChanged: (bool? value) {
-            setState(() {
-              _agreedToTerms = value!;
-            });
-          },
-          activeColor: const Color(0xFF2DBA9D),
-        ),
-        Expanded(
-          child: RichText(
-            textAlign: TextAlign.start,
-            text: TextSpan(
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              children: [
-                const TextSpan(text: 'عن طريق المتابعة، أنا أوافق على '),
-                TextSpan(
-                  text: 'شروط وقواعد الإستخدام',
-                  style: const TextStyle(
-                    color: Color(0xFF2DBA9D),
-                    fontWeight: FontWeight.bold,
-                    decoration: TextDecoration.underline,
-                  ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () {},
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class OrDivider extends StatelessWidget {
-  const OrDivider({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(child: Divider()),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: Text('أو إستخدام حساب جوجل', style: TextStyle(color: Colors.grey[600])),
-        ),
-        const Expanded(child: Divider()),
-      ],
+  InputDecoration _buildInputDecoration({required String hintText, Widget? suffixIcon}) {
+    return InputDecoration(
+      filled: true,
+      fillColor: Colors.grey[200],
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(30),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      hintText: hintText,
+      hintStyle: TextStyle(color: Colors.grey[400]),
+      suffixIcon: suffixIcon,
     );
   }
 }

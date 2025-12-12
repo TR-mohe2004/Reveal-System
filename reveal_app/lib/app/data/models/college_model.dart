@@ -1,25 +1,32 @@
-// lib/app/data/models/college_model.dart
-
-/// يمثل نموذج البيانات لكائن "الكلية"
 class College {
   final String id;
   final String name;
-  final String imageUrl;
+  final String? image; // Make image nullable
 
-  College({
-    required this.id,
-    required this.name,
-    required this.imageUrl,
-  });
+  College({required this.id, required this.name, this.image});
 
-  /// --- هذا هو الجزء الذي تم تعديله ---
-  /// دالة مصنعية (Factory) لتحويل بيانات Firestore إلى كائن College.
-  /// تستقبل ID المستند وخريطة البيانات (data) من Firestore.
-  factory College.fromFirestore(String id, Map<String, dynamic> data) {
+  factory College.fromJson(Map<String, dynamic> json) {
     return College(
-      id: id, // الـ ID يأتي من المستند نفسه
-      name: data['name'] ?? 'اسم غير معروف', // اقرأ حقل 'name' من البيانات
-      imageUrl: data['imageUrl'] ?? '', // اقرأ حقل 'imageUrl' من البيانات
+      id: json['id'].toString(), // Ensure id is a string
+      name: json['name'],
+      image: json['image'],
     );
   }
+
+  factory College.fromFirestore(String id, Map<String, dynamic> data) {
+    return College(
+      id: id,
+      name: data['name'] ?? '',
+      image: data['image'],
+    );
+  }
+
+  // For comparison in DropdownButton
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is College && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

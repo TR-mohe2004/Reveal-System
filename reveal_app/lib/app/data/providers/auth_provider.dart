@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/user_model.dart';
 import '../services/api_service.dart';
-import '../models/user_model.dart'; // تأكد أن ملف user_model.dart موجود
 
 enum AuthStatus {
   uninitialized,
@@ -11,12 +11,11 @@ enum AuthStatus {
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  
+
   AuthStatus _status = AuthStatus.uninitialized;
   User? _currentUser;
   String? _errorMessage;
 
-  // Getters
   AuthStatus get status => _status;
   User? get currentUser => _currentUser;
   String? get errorMessage => _errorMessage;
@@ -26,58 +25,41 @@ class AuthProvider with ChangeNotifier {
     _checkLoginStatus();
   }
 
-  // التحقق من حالة الدخول عند فتح التطبيق
   Future<void> _checkLoginStatus() async {
     final token = await _apiService.getToken();
+    debugPrint('Checking login status. Token: $token');
     if (token != null) {
-      _status = AuthStatus.authenticated;
-      // ملاحظة: هنا يمكن مستقبلاً إضافة دالة لجلب بيانات المستخدم (Profile)
+      await fetchUserProfile();
     } else {
       _status = AuthStatus.unauthenticated;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
-  // دالة تسجيل الدخول
-  Future<bool> login(String email, String password) async {
+  Future<void> fetchUserProfile() async {
     _status = AuthStatus.authenticating;
-    _errorMessage = null;
     notifyListeners();
-
     try {
-      final data = await _apiService.login(email, password);
-      
-      // حفظ بيانات المستخدم القادمة من الباك اند
-      if (data['user'] != null) {
-        _currentUser = User.fromJson(data['user']);
-      }
-      
+      final userData = await _apiService.getUserProfile();
+      _currentUser = User.fromJson(userData);
       _status = AuthStatus.authenticated;
       notifyListeners();
-      return true;
     } catch (e) {
-      _status = AuthStatus.unauthenticated;
-      // تنظيف رسالة الخطأ
-      _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      debugPrint('Error fetching user profile: $e');
+      await logout();
+      _errorMessage = 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول من جديد.';
       notifyListeners();
-      return false;
     }
   }
 
-  // دالة إنشاء الحساب (تم التعديل لتستقبل 3 متغيرات وتطابق ApiService)
-  Future<bool> signup(String fullName, String email, String password) async {
+  Future<bool> login(String phone, String password) async {
     _status = AuthStatus.authenticating;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // إرسال البيانات للـ API (تم تصحيح الاستدعاء)
-      final data = await _apiService.signup(fullName, email, password);
-      
-      if (data['user'] != null) {
-        _currentUser = User.fromJson(data['user']);
-      }
-
+      await _apiService.login(phone, password);
+      await fetchUserProfile();
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -89,7 +71,25 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // تسجيل الخروج
+  Future<bool> signup(String fullName, String phone, String password) async {
+    _status = AuthStatus.authenticating;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiService.signup(fullName, phone, password);
+      await fetchUserProfile();
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _status = AuthStatus.unauthenticated;
+      _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _apiService.removeToken();
     _currentUser = null;
@@ -97,3 +97,4 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 }
+

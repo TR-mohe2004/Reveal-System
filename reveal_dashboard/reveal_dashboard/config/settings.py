@@ -135,12 +135,12 @@ if not firebase_admin._apps:
             firebase_admin.initialize_app(cred, {
                 'storageBucket': 'revealapp-8af3f.appspot.com'
             })
-            print("✅ Firebase Admin SDK Initialized successfully!")
+            print("[OK] Firebase Admin SDK Initialized successfully!")
         else:
             # رسالة تحذيرية في الكونسول إذا لم يجد الملف
             print(f"⚠️ Warning: firebase-credentials.json not found at {FIREBASE_CREDS_PATH}")
     except Exception as e:
-        print(f"❌ Error initializing Firebase: {e}")
+        print(f"[X] Error initializing Firebase: {e}")
 
 # إعدادات Pyrebase (للواجهة الأمامية إن لزمت)
 PYREBASE_CONFIG = {

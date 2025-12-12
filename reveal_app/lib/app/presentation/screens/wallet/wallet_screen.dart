@@ -100,7 +100,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2DBA9D).withOpacity(0.4),
+                          color: const Color(0xFF2DBA9D).withValues(alpha: 0.4),
                           blurRadius: 15,
                           offset: const Offset(0, 8),
                         ),
@@ -120,7 +120,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -167,9 +167,9 @@ class _WalletScreenState extends State<WalletScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withOpacity(0.3)),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -258,7 +258,7 @@ class _WalletScreenState extends State<WalletScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 10,
                   spreadRadius: 2,
                 ),

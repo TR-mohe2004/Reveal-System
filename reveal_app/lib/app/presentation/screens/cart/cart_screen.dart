@@ -1,7 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:reveal_app/app/data/models/product_model.dart';
 import 'package:reveal_app/app/data/providers/cart_provider.dart';
-import 'package:reveal_app/app/data/services/api_service.dart'; // لتأكيد المسار فقط إذا احتجت كلاسات مساعدة
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -27,35 +27,31 @@ class _CartScreenState extends State<CartScreen> {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
-          // زر تفريغ السلة
           Consumer<CartProvider>(
             builder: (_, cart, __) => cart.items.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.delete_sweep_outlined, color: Colors.red),
-                    onPressed: () {
-                      _showClearCartDialog(context, cart);
-                    },
+                    onPressed: () => _showClearCartDialog(context, cart),
                   )
-                : const SizedBox(),
+                : const SizedBox.shrink(),
           )
         ],
       ),
       body: Consumer<CartProvider>(
         builder: (context, cart, child) {
-          // حالة السلة الفارغة
           if (cart.items.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.shopping_cart_outlined, size: 100, color: Colors.grey[300]),
+                  Icon(Icons.shopping_cart_outlined, size: 100, color: Colors.grey.shade300),
                   const SizedBox(height: 20),
                   Text(
-                    'سلة المشتريات فارغة',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey[500]),
+                    'السلة فارغة',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
                   ),
                   const SizedBox(height: 10),
-                  const Text('لم تقم بإضافة أي وجبات بعد', style: TextStyle(color: Colors.grey)),
+                  const Text('أضف منتجاتك المفضلة من القائمة', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             );
@@ -65,7 +61,6 @@ class _CartScreenState extends State<CartScreen> {
 
           return Column(
             children: [
-              // قائمة المنتجات
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -73,8 +68,7 @@ class _CartScreenState extends State<CartScreen> {
                   separatorBuilder: (c, i) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = cartItems[index];
-                    
-                    // Dismissible للسحب والحذف
+
                     return Dismissible(
                       key: ValueKey(item.id),
                       direction: DismissDirection.endToStart,
@@ -87,16 +81,14 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         child: const Icon(Icons.delete, color: Colors.white, size: 30),
                       ),
-                      onDismissed: (direction) {
-                        cart.removeItem(item.id);
-                      },
+                      onDismissed: (direction) => cart.removeItem(item.id),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(0.08),
+                              color: Colors.grey.withValues(alpha: 0.08),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -106,7 +98,6 @@ class _CartScreenState extends State<CartScreen> {
                           padding: const EdgeInsets.all(12.0),
                           child: Row(
                             children: [
-                              // الصورة
                               Container(
                                 width: 80,
                                 height: 80,
@@ -120,13 +111,11 @@ class _CartScreenState extends State<CartScreen> {
                                         )
                                       : null,
                                 ),
-                                child: item.imageUrl.isEmpty 
-                                  ? const Icon(Icons.fastfood, color: Colors.grey) 
-                                  : null,
+                                child: item.imageUrl.isEmpty
+                                    ? const Icon(Icons.fastfood, color: Colors.grey)
+                                    : null,
                               ),
                               const SizedBox(width: 16),
-                              
-                              // التفاصيل
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,17 +141,14 @@ class _CartScreenState extends State<CartScreen> {
                                   ],
                                 ),
                               ),
-                              
-                              // أزرار التحكم بالكمية
                               Container(
                                 decoration: BoxDecoration(
                                   color: Colors.grey[50],
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.grey[200]!),
+                                  border: Border.all(color: Colors.grey.shade200),
                                 ),
                                 child: Row(
                                   children: [
-                                    // زر -
                                     InkWell(
                                       onTap: () => cart.removeSingleItem(item.id),
                                       child: const Padding(
@@ -174,15 +160,10 @@ class _CartScreenState extends State<CartScreen> {
                                       '${item.quantity}',
                                       style: const TextStyle(fontWeight: FontWeight.bold),
                                     ),
-                                    // زر +
                                     InkWell(
                                       onTap: () {
-                                        // لزيادة الكمية، نحتاج لإنشاء كائن Product وهمي أو تعديل addItem
-                                        // للتبسيط هنا، سنعتمد أن المستخدم يضيف من القائمة الرئيسية،
-                                        // أو يمكن تعديل addItem لتقبل ID فقط.
-                                        // الحل السريع للزيادة هو تكرار addItem ولكنها تتطلب Product كامل.
-                                        // الأفضل هنا الاكتفاء بالناقص والحذف، والزيادة من القائمة،
-                                        // أو تعديل Provider ليقبل زيادة الكمية مباشرة عبر ID.
+                                        final product = Product.fromCartItem(item);
+                                        cart.addItem(product);
                                       },
                                       child: const Padding(
                                         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -200,8 +181,6 @@ class _CartScreenState extends State<CartScreen> {
                   },
                 ),
               ),
-
-              // منطقة الدفع (Bottom Sheet)
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -209,7 +188,7 @@ class _CartScreenState extends State<CartScreen> {
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.15),
+                      color: Colors.grey.withValues(alpha: 0.15),
                       blurRadius: 20,
                       offset: const Offset(0, -5),
                     ),
@@ -221,7 +200,7 @@ class _CartScreenState extends State<CartScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'المجموع الكلي:',
+                          'الإجمالي الكلي:',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                         ),
                         Text(
@@ -239,21 +218,17 @@ class _CartScreenState extends State<CartScreen> {
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () async {
-                                await _handleCheckout(context, cart);
-                              },
+                        onPressed: _isLoading ? null : () => _handleCheckout(context, cart),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2DBA9D),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 5,
-                          shadowColor: const Color(0xFF2DBA9D).withOpacity(0.4),
+                          shadowColor: const Color(0xFF2DBA9D).withValues(alpha: 0.4),
                         ),
                         child: _isLoading
                             ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
-                                'تأكيد الطلب والدفع',
+                                'تأكيد الطلب',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -272,49 +247,46 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  // دالة معالجة الدفع
   Future<void> _handleCheckout(BuildContext context, CartProvider cart) async {
     setState(() => _isLoading = true);
 
-    // استدعاء دالة الدفع في المزود
-    final success = await cart.checkout();
+    try {
+      final success = await cart.checkout();
 
-    setState(() => _isLoading = false);
+      if (!context.mounted) return;
 
-    if (!context.mounted) return;
-
-    if (success) {
-      // نجاح
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 60),
-          content: const Text(
-            'تم استلام طلبك بنجاح!\nسيتم البدء في تحضيره فوراً.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16),
+      if (success) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 60),
+            content: const Text(
+              'تم تأكيد الطلب!\nسنبدأ في تحضير طلبك الآن.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                child: const Text('حسناً', style: TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx); // إغلاق الديالوج
-                Navigator.pop(context); // العودة للرئيسية
-              },
-              child: const Text('حسناً', style: TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold)),
-            )
-          ],
-        ),
-      );
-    } else {
-      // فشل (رصيد غير كافي أو خطأ سيرفر)
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.error_outline, color: Colors.white),
-              SizedBox(width: 10),
-              Text('فشل الطلب! تأكد من رصيد محفظتك.'),
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text('حدث خطأ: ${e.toString()}')),
             ],
           ),
           backgroundColor: Colors.redAccent,
@@ -322,16 +294,19 @@ class _CartScreenState extends State<CartScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  // ديالوج تأكيد الحذف
   void _showClearCartDialog(BuildContext context, CartProvider cart) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('تفريغ السلة؟'),
-        content: const Text('هل أنت متأكد من حذف جميع العناصر من السلة؟'),
+        title: const Text('مسح السلة'),
+        content: const Text('هل تريد مسح جميع المنتجات من السلة؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -342,7 +317,7 @@ class _CartScreenState extends State<CartScreen> {
               cart.clear();
               Navigator.pop(ctx);
             },
-            child: const Text('حذف الكل', style: TextStyle(color: Colors.red)),
+            child: const Text('مسح الكل', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),

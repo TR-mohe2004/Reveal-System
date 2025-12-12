@@ -138,7 +138,7 @@ class _OTPScreenState extends State<OTPScreen> {
                     showCursor: true,
                     onCompleted: (pin) {
                       // TODO: Implement OTP verification logic
-                      print('Completed: $pin');
+                      debugPrint('Completed: $pin');
                     },
                   ),
                   const SizedBox(height: 32),
@@ -171,7 +171,7 @@ class _OTPScreenState extends State<OTPScreen> {
                     onPressed: () {
                       // TODO: Implement OTP verification logic
                       if (_formKey.currentState!.validate()) {
-                        print('Submitting OTP: ${_pinController.text}');
+                        debugPrint('Submitting OTP: ${_pinController.text}');
                       }
                     },
                     style: ElevatedButton.styleFrom(

@@ -1,17 +1,25 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
 import '../services/api_service.dart';
 
+/// Exception thrown when attempting to mix products from different colleges.
+class MismatchedCollegeException implements Exception {
+  final String message;
+  MismatchedCollegeException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class CartProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
-  
-  // تخزين العناصر: المفتاح هو ID المنتج كـ String
+
+  // Keyed by product ID (String)
   final Map<String, CartItem> _items = {};
 
   Map<String, CartItem> get items => _items;
 
-  // حساب الإجمالي الكلي
   double get totalAmount {
     var total = 0.0;
     _items.forEach((key, item) {
@@ -20,7 +28,6 @@ class CartProvider extends ChangeNotifier {
     return total;
   }
 
-  // عدد العناصر في السلة (مجموع الكميات)
   int get itemCount {
     var count = 0;
     _items.forEach((key, item) {
@@ -29,10 +36,15 @@ class CartProvider extends ChangeNotifier {
     return count;
   }
 
-  // إضافة منتج للسلة
   void addItem(Product product) {
+    // Prevent mixing items from different colleges
+    if (_items.isNotEmpty && _items.values.first.collegeId != product.collegeId) {
+      throw MismatchedCollegeException(
+        'لا يمكنك إضافة منتجات من كليات مختلفة في نفس السلة. يرجى إكمال الطلب الحالي أو إفراغ السلة أولاً.',
+      );
+    }
+
     if (_items.containsKey(product.id.toString())) {
-      // إذا كان المنتج موجوداً، نزيد الكمية
       _items.update(
         product.id.toString(),
         (existing) => CartItem(
@@ -46,7 +58,6 @@ class CartProvider extends ChangeNotifier {
         ),
       );
     } else {
-      // إذا كان جديداً، نضيفه
       _items.putIfAbsent(
         product.id.toString(),
         () => CartItem(
@@ -63,7 +74,6 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // تقليل كمية منتج واحد (أو حذفه إذا وصل للصفر)
   void removeSingleItem(String productId) {
     if (!_items.containsKey(productId)) {
       return;
@@ -87,45 +97,42 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // حذف منتج بالكامل من السلة
   void removeItem(String productId) {
     _items.remove(productId);
     notifyListeners();
   }
 
-  // تفريغ السلة
   void clear() {
     _items.clear();
     notifyListeners();
   }
 
-  // إرسال الطلب للسيرفر (Checkout)
   Future<bool> checkout() async {
-    if (_items.isEmpty) return false;
+    if (_items.isEmpty) {
+      return false;
+    }
 
-    // تجهيز قائمة المنتجات للباك اند
-    // Django يتوقع: [{'product_id': 1, 'qty': 2}, ...]
-    List<Map<String, dynamic>> orderItems = [];
-    
+    final List<Map<String, dynamic>> orderItems = [];
+    final collegeId = _items.values.first.collegeId;
+
     _items.forEach((key, item) {
+      final productId = int.tryParse(item.id);
+      if (productId == null) {
+        throw FormatException('معرّف المنتج غير صالح: ${item.id}');
+      }
       orderItems.add({
-        'product_id': int.parse(item.id), // تحويل الـ ID لرقم لأن الباك اند يتوقع int
-        'qty': item.quantity,             // لاحظ: استخدمنا 'qty' لتطابق serializer المنظومة
+        'product_id': productId,
+        'qty': item.quantity,
       });
     });
 
     try {
-      // إرسال السعر الإجمالي وقائمة العناصر
-      bool success = await _apiService.createOrder(totalAmount, orderItems);
-      
-      if (success) {
-        clear(); // تفريغ السلة عند النجاح
-        return true;
-      }
-      return false;
+      await _apiService.createOrder(totalAmount, orderItems, collegeId);
+      clear();
+      return true;
     } catch (e) {
-      print("Error during checkout: $e");
-      return false;
+      rethrow;
     }
   }
 }
+

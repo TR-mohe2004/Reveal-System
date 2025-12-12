@@ -1,5 +1,6 @@
 // lib/app/data/repositories/college_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:reveal_app/app/data/models/college_model.dart';
 
 class CollegeRepository {
@@ -20,11 +21,11 @@ class CollegeRepository {
             }).toList();
           })
           .handleError((error) {
-            print("Error in getCollegesStream: $error");
+            debugPrint('Error in getCollegesStream: $error');
             return [];
           });
     } catch (e) {
-      print("Caught exception in getCollegesStream: $e");
+      debugPrint('Caught exception in getCollegesStream: $e');
       return Stream.value([]);
     }
   }

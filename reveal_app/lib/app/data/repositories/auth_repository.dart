@@ -10,8 +10,7 @@ class AuthRepository {
   // Singleton Pattern
   AuthRepository._privateConstructor()
       // ✨✨✨ هذا هو السطر الذي تم إصلاحه ✨✨✨
-      : _firebaseAuth = auth.FirebaseAuth.instance, 
-        _firestore = FirebaseFirestore.instance;
+      : _firebaseAuth = auth.FirebaseAuth.instance, _firestore = FirebaseFirestore.instance;
 
   static final AuthRepository instance = AuthRepository._privateConstructor();
 
@@ -45,9 +44,13 @@ class AuthRepository {
       }
       
       return userCredential;
+    } on auth.FirebaseAuthException catch (_) {
+      // إعادة رمي الخطأ الأصلي من Firebase للسماح للواجهة بمعالجته بشكل دقيق
+      // مثلاً، يمكن للواجهة التحقق من e.code == 'email-already-in-use'
+      rethrow;
     } catch (e) {
-      // إعادة رمي الخطأ للتعامل معه في الواجهة
-      throw Exception('فشل في إنشاء الحساب: ${e.toString()}');
+      // لأي أخطاء أخرى غير متوقعة
+      throw Exception('فشل في إنشاء الحساب. حدث خطأ غير متوقع.');
     }
   }
 
@@ -60,7 +63,12 @@ class AuthRepository {
         email: email,
         password: password,
       );
+    } on auth.FirebaseAuthException catch (_) {
+      // إعادة رمي الخطأ الأصلي من Firebase
+      // يسمح للواجهة بالتحقق من e.code مثل 'user-not-found' أو 'wrong-password'
+      rethrow;
     } catch (e) {
+      // لأي أخطاء أخرى غير متوقعة
       throw Exception('فشل في تسجيل الدخول: ${e.toString()}');
     }
   }
