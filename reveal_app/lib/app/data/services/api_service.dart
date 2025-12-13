@@ -8,14 +8,10 @@ import 'package:reveal_app/app/data/models/wallet_model.dart';
 import 'package:reveal_app/app/data/models/order_model.dart';
 
 class ApiService {
+  // ✅ تم تحديث الرابط ليشير إلى استضافة PythonAnywhere
+  // هذا الرابط يعمل للويب وللأندرويد ولكل المنصات
   static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
-    } else if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000';
-    } else {
-      return 'http://127.0.0.1:8000';
-    }
+    return "https://RevealSystem.pythonanywhere.com";
   }
 
   static const String _tokenKey = 'auth_token';
@@ -51,7 +47,7 @@ class ApiService {
   // 2. المصادقة (Auth)
   // ---------------------------------------------------------------------------
 
-  // تسجيل الدخول (تم التصحيح)
+  // تسجيل الدخول
   Future<Map<String, dynamic>> login(String phone, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/login/');
     debugPrint('🔵 [LOGIN] URL: $url');
@@ -59,7 +55,7 @@ class ApiService {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        // تم التعديل لإرسال phone_number بدلاً من email
+        // إرسال phone_number بدلاً من email ليتوافق مع التعديلات
         body: json.encode({'phone_number': phone, 'password': password}),
       );
 
@@ -78,7 +74,7 @@ class ApiService {
     }
   }
 
-  // إنشاء حساب جديد (تم التصحيح)
+  // إنشاء حساب جديد
   Future<Map<String, dynamic>> signup(String fullName, String phone, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/signup/');
     try {
@@ -86,7 +82,6 @@ class ApiService {
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          // تم حذف الإيميل
           'full_name': fullName,
           'phone_number': phone,
           'password': password,
@@ -101,18 +96,18 @@ class ApiService {
         return data;
       } else {
         final errorBody = json.decode(utf8.decode(response.bodyBytes));
-        String message = 'Failed to create account.';
+        String message = 'فشل إنشاء الحساب.';
         if (errorBody is Map) {
-          if (errorBody.containsKey('email')) {
-            message = 'Email: ${errorBody['email'][0]}';
+          if (errorBody.containsKey('username')) {
+             message = 'رقم الهاتف مستخدم بالفعل.';
           } else if (errorBody.containsKey('phone_number')) {
-            message = 'Phone Number: ${errorBody['phone_number'][0]}';
+            message = 'رقم الهاتف: ${errorBody['phone_number'][0]}';
           }
         }
         throw Exception(message);
       }
     } catch (e) {
-      throw Exception('Connection error: $e');
+      throw Exception('خطأ في الاتصال: $e');
     }
   }
 
@@ -136,6 +131,7 @@ class ApiService {
   // ---------------------------------------------------------------------------
   // 3. البيانات (Data)
   // ---------------------------------------------------------------------------
+  
   Future<List<College>> getCafes() async {
     final url = Uri.parse('$baseUrl/api/cafes/');
     debugPrint('🏫 [GET CAFES] URL: $url');
@@ -146,11 +142,11 @@ class ApiService {
         return cafeData.map((json) => College.fromJson(json)).toList();
       } else {
         debugPrint('Server Error fetching cafes: ${response.statusCode}');
-        throw Exception('Failed to load cafes from the server');
+        throw Exception('فشل تحميل الكافيتيريات من الخادم');
       }
     } catch (e) {
       debugPrint('Error fetching cafes: $e');
-      throw Exception('A network error occurred while fetching cafes.');
+      throw Exception('حدث خطأ في الشبكة أثناء جلب الكافيتيريات.');
     }
   }
 
@@ -168,7 +164,9 @@ class ApiService {
         final productData = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
         return productData.map((json) {
           String imagePath = json['image'] ?? '';
+          // إصلاح مسار الصورة في حال كان نسبياً
           if (imagePath.isNotEmpty && !imagePath.startsWith('http')) {
+             // إزالة السلاش المكرر إن وجد
             if (imagePath.startsWith('/')) {
               imagePath = imagePath.substring(1);
             }
@@ -198,11 +196,11 @@ class ApiService {
         return Wallet.fromJson(data);
       } else {
         debugPrint('Server Error fetching wallet: ${response.statusCode}');
-        throw Exception('Failed to load wallet data.');
+        throw Exception('فشل تحميل بيانات المحفظة.');
       }
     } catch (e) {
       debugPrint('Error fetching wallet: $e');
-      throw Exception('A network error occurred while fetching your wallet.');
+      throw Exception('حدث خطأ في الشبكة أثناء جلب محفظتك.');
     }
   }
 
@@ -244,11 +242,11 @@ class ApiService {
         return orderData.map((json) => Order.fromJson(json)).toList();
       } else {
         debugPrint('Server Error fetching orders: ${response.statusCode}');
-        throw Exception('Failed to load orders from server');
+        throw Exception('فشل تحميل الطلبات من الخادم');
       }
     } catch (e) {
       debugPrint('Error fetching orders: $e');
-      throw Exception('Network error while fetching orders.');
+      throw Exception('خطأ في الشبكة أثناء جلب الطلبات.');
     }
   }
 
@@ -272,4 +270,3 @@ class ApiService {
     }
   }
 }
-

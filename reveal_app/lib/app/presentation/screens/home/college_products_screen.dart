@@ -59,7 +59,7 @@ class _CollegeProductsScreenState extends State<CollegeProductsScreen> {
                   alignment: Alignment.center,
                   children: [
                     // صورة الغلاف
-                    const Positioned(
+                    Positioned(
                       top: 0,
                       left: 0,
                       right: 0,
@@ -101,7 +101,7 @@ class _CollegeProductsScreenState extends State<CollegeProductsScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const SizedBox(height: 8),
@@ -158,9 +158,9 @@ class _CollegeProductsScreenState extends State<CollegeProductsScreen> {
             // 3. شريط البحث والفلاتر الذي يثبت في الأعلى عند التمرير
             SliverPersistentHeader(
               delegate: _SliverHeaderDelegate(
-                child: const Container(
+                child: Container(
                   color: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: const Column(
                     children: [
                       SearchBarWidget(),
@@ -186,7 +186,7 @@ class _CollegeProductsScreenState extends State<CollegeProductsScreen> {
                   childAspectRatio: 0.75, // نسبة العرض إلى الارتفاع للبطاقة
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => const ProductCard(),
+                  (context, index) => ProductCard(),
                   childCount: 10, // عدد وهمي للمنتجات
                 ),
               ),
@@ -309,7 +309,7 @@ class _ProductCardState extends State<ProductCard> {
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: Colors.grey[100],
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
@@ -356,12 +356,12 @@ class _ProductCardState extends State<ProductCard> {
             ),
           ),
           const Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: const Column(
+            padding: EdgeInsets.all(8.0),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text('اسم الصنف', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('00 دينار', style: TextStyle(color: Colors.grey)),
+                Text('اسم الصنف', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('00 دينار', style: TextStyle(color: Colors.grey)),
               ],
             ),
           ),
