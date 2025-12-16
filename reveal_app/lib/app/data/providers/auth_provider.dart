@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/user_model.dart';
-import '../services/api_service.dart';
+// ✅ تم تعديل المسارات لتكون دقيقة (Absolute Imports)
+import 'package:reveal_app/app/data/models/user_model.dart';
+import 'package:reveal_app/app/data/services/api_service.dart';
 
 enum AuthStatus {
   uninitialized,
@@ -27,7 +28,6 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> _checkLoginStatus() async {
     final token = await _apiService.getToken();
-    debugPrint('Checking login status. Token: $token');
     if (token != null) {
       await fetchUserProfile();
     } else {
@@ -45,20 +45,19 @@ class AuthProvider with ChangeNotifier {
       _status = AuthStatus.authenticated;
       notifyListeners();
     } catch (e) {
-      debugPrint('Error fetching user profile: $e');
       await logout();
-      _errorMessage = 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول من جديد.';
+      _errorMessage = 'انتهت صلاحية الجلسة';
       notifyListeners();
     }
   }
 
-  Future<bool> login(String phone, String password) async {
+  Future<bool> login(String email, String password) async {
     _status = AuthStatus.authenticating;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      await _apiService.login(phone, password);
+      await _apiService.login(email, password);
       await fetchUserProfile();
       _status = AuthStatus.authenticated;
       notifyListeners();
@@ -71,13 +70,14 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> signup(String fullName, String phone, String password) async {
+  // ✅ الدالة الآن تستقبل الإيميل وتمرره بشكل صحيح (4 متغيرات)
+  Future<bool> signup(String fullName, String email, String phone, String password) async {
     _status = AuthStatus.authenticating;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      await _apiService.signup(fullName, phone, password);
+      await _apiService.signup(fullName, email, phone, password);
       await fetchUserProfile();
       _status = AuthStatus.authenticated;
       notifyListeners();
@@ -97,4 +97,3 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 }
-

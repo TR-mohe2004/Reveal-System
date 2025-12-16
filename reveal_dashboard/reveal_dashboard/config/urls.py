@@ -4,19 +4,16 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    # رابط لوحة التحكم
+    # رابط لوحة تحكم الأدمن الخاصة بـ Django
     path('admin/', admin.site.urls),
     
-    # روابط المنظومة (الداشبورد)
+    # ✅ التعديل الحاسم:
+    # نوجه كل الطلبات (سواء كانت للداشبورد أو للـ API) إلى ملف core.urls
+    # لأننا قمنا بتعريف مسارات مثل 'api/login' و 'dashboard/' داخله
     path('', include('core.urls')),
-    
-    # روابط المنتجات والطلبات (API)
-    path('api/', include('core.api_urls')),
-    
-    #  روابط المصادقة (تم تفعيلها الآن) 
-    path('api/auth/', include('users.api_urls')),
 ]
 
+# إعدادات ملفات الميديا (الصور)
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)    

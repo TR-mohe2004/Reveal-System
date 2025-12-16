@@ -1,52 +1,44 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:reveal_app/app/core/enums/view_state.dart';
 import 'package:reveal_app/app/data/models/college_model.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
-
-enum CollegeState { initial, loading, loaded, error }
 
 class CollegeProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
 
-  List<College> _availableColleges = [];
-  College? _selectedCollege; // Can be null initially
-  CollegeState _state = CollegeState.initial;
-  String _errorMessage = '';
+  List<College> _colleges = [];
+  College? _selectedCollege;
+  ViewState _state = ViewState.idle;
+  String? _errorMessage;
 
-  CollegeProvider() {
-    fetchColleges();
-  }
-
-  // Getters
-  List<College> get availableColleges => _availableColleges;
+  List<College> get colleges => _colleges;
   College? get selectedCollege => _selectedCollege;
-  CollegeState get state => _state;
-  String get errorMessage => _errorMessage;
+  ViewState get state => _state;
+  String? get errorMessage => _errorMessage;
 
-  // Fetch colleges from the API
   Future<void> fetchColleges() async {
-    _state = CollegeState.loading;
+    _state = ViewState.busy;
     notifyListeners();
-    try {
-      _availableColleges = await _apiService.getCafes();
-      if (_availableColleges.isNotEmpty) {
-        _selectedCollege = _availableColleges.first;
-        _state = CollegeState.loaded;
-      } else {
-        _state = CollegeState.error;
-        _errorMessage = 'No colleges found.';
-      }
-    } catch (e) {
-      _state = CollegeState.error;
-      _errorMessage = e.toString();
-    }
-    notifyListeners();
-  }
 
-  // Setter for selecting a college
-  void selectCollege(College newCollege) {
-    if (_selectedCollege?.id != newCollege.id) {
-      _selectedCollege = newCollege;
+    try {
+      _colleges = await _apiService.getCafes();
+      _errorMessage = null;
+      _state = ViewState.idle;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _state = ViewState.error;
+    } finally {
       notifyListeners();
     }
+  }
+
+  void selectCollege(College? college) {
+    _selectedCollege = college;
+    notifyListeners();
+  }
+
+  void clearSelection() {
+    _selectedCollege = null;
+    notifyListeners();
   }
 }

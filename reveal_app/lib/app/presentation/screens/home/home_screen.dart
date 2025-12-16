@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:reveal_app/app/data/providers/product_provider.dart';
+import 'package:reveal_app/app/core/enums/view_state.dart';
 import 'package:reveal_app/app/data/models/product_model.dart';
 import 'package:reveal_app/app/data/providers/auth_provider.dart';
+import 'package:reveal_app/app/data/providers/product_provider.dart';
+import 'package:reveal_app/app/data/providers/wallet_provider.dart'; // تأكد أن هذا المسار صحيح
+import 'package:reveal_app/app/presentation/widgets/product_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,173 +15,198 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // متغير لتغيير العنوان حسب الكلية المختارة
-  String pageTitle = "المطاعم";
+  static const String _allCategoryLabel = ProductProvider.allCategoryLabel;
+  final TextEditingController _searchController = TextEditingController();
+  
+  // عناوين متغيرة حسب الوقت
+  String get greetingMessage {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'صباح الخير ☀️';
+    if (hour < 18) return 'مساء الخير 🌤️';
+    return 'سهرة سعيدة 🌙';
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProductProvider>(context, listen: false).fetchAllProducts();
+      _loadData();
     });
+  }
+
+  // دالة لجلب كل البيانات مرة واحدة
+  Future<void> _loadData() async {
+    final productProvider = context.read<ProductProvider>();
+    final walletProvider = context.read<WalletProvider>(); // لجلب الرصيد
+    
+    // نشغل الاثنين مع بعض لتقليل وقت الانتظار
+    await Future.wait([
+      productProvider.fetchAllProducts(),
+      walletProvider.fetchWalletData(),
+    ]);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = Provider.of<AuthProvider>(context).currentUser;
-    
+    // نستدعي البروفايدرز
+    final user = context.watch<AuthProvider>().currentUser;
+    final productProvider = context.watch<ProductProvider>();
+    final walletProvider = context.watch<WalletProvider>();
+
+    final categories = <String>{_allCategoryLabel, ...productProvider.availableCategories}.toList();
+    final displayProducts = productProvider.products;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[50], // خلفية أهدأ للعين
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // 1. الهيدر (الاسم والموقع)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(icon: const Icon(Icons.favorite_border), onPressed: () {}),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'أهلاً، ${user?.fullName ?? "الطالب"}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        child: RefreshIndicator(
+          onRefresh: _loadData, // تحديث البيانات عند السحب
+          color: const Color(0xFF2DBA9D),
+          child: CustomScrollView(
+            slivers: [
+              // 1. الرأس (Header) والمحفظة
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      // الشريط العلوي (الاسم والقائمة)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // زر القائمة الجانبية
+                          Builder(
+                            builder: (ctx) => Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10)],
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.menu, color: Colors.black87),
+                                onPressed: () => Scaffold.of(context).openEndDrawer(),
+                              ),
+                            ),
+                          ),
+                          
+                          // نصوص الترحيب
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '$greetingMessage، ${user?.fullName?.split(' ')[0] ?? "ضيف"}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const Text(
+                                'اطلب وجبتك واستمتع',
+                                style: TextStyle(color: Colors.grey, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 20),
+
+                      // 2. بطاقة المحفظة (جديد 🔥)
+                      _buildWalletCard(walletProvider),
+                      
+                      const SizedBox(height: 20),
+
+                      // 3. مربع البحث
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 15),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
                         ),
-                        const Text(
-                          'موقعك: جامعة طرابلس',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        child: TextField(
+                          controller: _searchController,
+                          textAlign: TextAlign.right,
+                          textInputAction: TextInputAction.search,
+                          onChanged: (value) {
+                            productProvider.updateSearchQuery(value);
+                            setState(() {});
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'ابحث عن وجبتك المفضلة...',
+                            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                            border: InputBorder.none,
+                            prefixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.grey),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      productProvider.updateSearchQuery('');
+                                      setState(() {});
+                                    },
+                                  )
+                                : null,
+                            suffixIcon: const Icon(Icons.search, color: Color(0xFF2DBA9D)),
+                          ),
                         ),
-                      ],
-                    ),
-                    IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
-              // 2. العنوان (المطاعم أو اسم الكلية)
-              Text(
-                pageTitle, 
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-
-              // 3. شريط البحث
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: const TextField(
-                    textAlign: TextAlign.right,
-                    decoration: InputDecoration(
-                      hintText: 'هل تبحث عن حاجة معينة؟',
-                      border: InputBorder.none,
-                      suffixIcon: Icon(Icons.search),
-                    ),
+              // 4. التصنيفات بالصور (Visual Categories)
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 100,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    reverse: true, // لتبدأ من اليمين
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    children: [
+                      _buildCategoryItem("مشروبات", "assets/images/drinks.png"),
+                      _buildCategoryItem("حلويات", "assets/images/dessert.png"),
+                      _buildCategoryItem("بيتزا", "assets/images/pizza.png"),
+                      _buildCategoryItem("برجر", "assets/images/burger.png"),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
 
-              // 4. التصنيفات (صور حقيقية بدلاً من الأيقونات)
-              SizedBox(
-                height: 110, // زيادة الارتفاع قليلاً لاستيعاب الصور والنص
-                child: ListView(
+              // 5. فلاتر التصنيفات (Chips)
+              SliverToBoxAdapter(
+                child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  reverse: true, // لتبدأ من اليمين
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  children: [
-                    _buildCategoryItem("مشروبات", "assets/images/drinks.png"),
-                    _buildCategoryItem("حلى", "assets/images/dessert.png"), // استبدال أكل صحي بـ حلى
-                    _buildCategoryItem("بيتزا", "assets/images/pizza.png"), // استبدال سندويتش بـ بيتزا
-                    _buildCategoryItem("برجر", "assets/images/burger.png"),
-                  ],
+                  reverse: true,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 16),
+                      ...categories.map((category) {
+                        final isSelected = productProvider.selectedCategory == category ||
+                            (productProvider.selectedCategory == null && category == _allCategoryLabel);
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 10),
+                          child: GestureDetector(
+                            onTap: () => productProvider.filterByCategory(
+                              category == _allCategoryLabel ? null : category,
+                            ),
+                            child: _buildFilterChip(category, isSelected: isSelected),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
 
-              // 5. الفلاتر
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                reverse: true,
-                child: Row(
-                  children: [
-                    const SizedBox(width: 16),
-                    _buildFilterChip("فلترة", isSelected: true),
-                    _buildFilterChip("الموقع"),
-                    _buildFilterChip("التقييم"),
-                    _buildFilterChip("الأسعار"),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // 6. عنوان "أفضل العروض"
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text("أفضل العروض >", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // 7. قائمة المنتجات
-              Consumer<ProductProvider>(
-                builder: (context, provider, child) {
-                  // استخدام بيانات وهمية للعرض إذا كانت القائمة فارغة (مؤقتاً للتحقق من التصميم)
-                  final displayProducts = provider.products.isNotEmpty 
-                      ? provider.products 
-                      : [
-                          Product(
-                            id: "1", 
-                            name: "اسم الكافيتيريا - المنطقة والعنوان", 
-                            price: 0.0, 
-                            imageUrl: "", // سيتم استخدام الأيقونة الافتراضية
-                            description: "عدد الأصناف المتوفرة: 255 صنف",
-                            category: "مطعم",
-                            collegeId: "1",
-                            collegeName: "جامعة طرابلس",
-                          ),
-                          Product(
-                            id: "2", 
-                            name: "مطعم الجامعة الرئيسي", 
-                            price: 0.0, 
-                            imageUrl: "", 
-                            description: "شاورما، برجر، ومشروبات",
-                            category: "مطعم",
-                            collegeId: "1",
-                            collegeName: "جامعة طرابلس",
-                          ),
-                          Product(
-                            id: "3", 
-                            name: "كافيتيريا العلوم", 
-                            price: 0.0, 
-                            imageUrl: "", 
-                            description: "سندويتشات وقهوة",
-                            category: "كافيتيريا",
-                            collegeId: "2",
-                            collegeName: "كلية العلوم",
-                          ),
-                        ];
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: displayProducts.length,
-                    itemBuilder: (context, index) {
-                      return RestaurantCard(product: displayProducts[index]);
-                    },
-                  );
-                },
+              // 6. قائمة المنتجات
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: _buildProductsList(productProvider, displayProducts),
               ),
             ],
           ),
@@ -187,25 +215,146 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // تعديل لبناء العنصر باستخدام صورة بدلاً من أيقونة
+  // ودجت بطاقة المحفظة
+  Widget _buildWalletCard(WalletProvider provider) {
+    final balance = provider.wallet?.balance ?? 0.0;
+    final isCharged = balance > 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isCharged 
+              ? [const Color(0xFF2DBA9D), const Color(0xFF1A9F84)] // أخضر إذا مشحونة
+              : [const Color(0xFF607D8B), const Color(0xFF455A64)], // رمادي إذا فارغة
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: (isCharged ? const Color(0xFF2DBA9D) : Colors.grey).withOpacity(0.4),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // الرصيد
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'رصيد المحفظة',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '${balance.toStringAsFixed(2)} د.ل',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          // الأيقونة
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isCharged ? Icons.account_balance_wallet : Icons.money_off,
+              color: Colors.white,
+              size: 30,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ودجت بناء قائمة المنتجات (Sliver)
+  Widget _buildProductsList(ProductProvider provider, List<Product> displayProducts) {
+    if (provider.state == ViewState.busy) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(50),
+          child: Center(child: CircularProgressIndicator(color: Color(0xFF2DBA9D))),
+        ),
+      );
+    }
+
+    if (provider.state == ViewState.error) {
+      return SliverToBoxAdapter(
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline, size: 50, color: Colors.red),
+              const SizedBox(height: 10),
+              Text(provider.errorMessage ?? 'فشل تحميل المنتجات'),
+              TextButton(
+                onPressed: provider.fetchAllProducts,
+                child: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (displayProducts.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.only(top: 50),
+            child: Text(
+              'لا توجد منتجات مطابقة للبحث.',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: ProductCard(product: displayProducts[index]),
+          );
+        },
+        childCount: displayProducts.length,
+      ),
+    );
+  }
+
+  // ودجت التصنيف الصوري (Visual Category)
   Widget _buildCategoryItem(String title, String imagePath) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         children: [
           Container(
-            width: 70,
-            height: 70,
+            width: 65,
+            height: 65,
             decoration: BoxDecoration(
-              color: const Color(0xFFFCE4EC), // خلفية فاتحة مشابهة للصورة
-              borderRadius: BorderRadius.circular(20), // تدوير الحواف ليصبح مربع بحواف دائرية كما في الصورة
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
               image: DecorationImage(
                 image: AssetImage(imagePath),
                 fit: BoxFit.cover,
               ),
-               boxShadow: [
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.2),
+                  color: Colors.grey.withOpacity(0.1),
                   blurRadius: 5,
                   offset: const Offset(0, 3),
                 ),
@@ -214,133 +363,37 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            title, 
+            title,
             style: const TextStyle(
-              fontSize: 14, 
+              fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.black87
-            )
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, {bool isSelected = false}) {
-    return Container(
-      margin: const EdgeInsets.only(right: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF2DBA9D) : Colors.white, // تلوين الخلفية عند التحديد
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isSelected ? const Color(0xFF2DBA9D) : Colors.grey[300]!),
-      ),
-      child: Row(
-        children: [
-          Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.black)), // النص أبيض عند التحديد
-          if (isSelected) ...[
-            const SizedBox(width: 5),
-            const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white)
-          ]
-        ],
-      ),
-    );
-  }
-}
-
-// ✨✨✨ Restaurant Card ✨✨✨
-class RestaurantCard extends StatelessWidget {
-  final Product product;
-  const RestaurantCard({super.key, required this.product});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.grey.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 5)),
-        ],
-      ),
-      child: Column(
-        children: [
-          // الجزء الرمادي (الصورة)
-          Stack(
-            children: [
-              Container(
-                height: 160,
-                decoration: const BoxDecoration(
-                  color: Colors.grey, 
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: product.imageUrl.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                        child: Image.network(
-                          product.imageUrl,
-                          width: double.infinity,
-                          height: 160,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c,o,s) => const Center(child: Icon(Icons.image, size: 50, color: Colors.white)),
-                        ),
-                      )
-                    : const Center(child: Icon(Icons.image, size: 50, color: Colors.white)),
-              ),
-              // أيقونة القلب
-              Positioned(
-                top: 15,
-                left: 15,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                  child: const Icon(Icons.favorite_border, size: 20, color: Colors.black54),
-                ),
-              ),
-              // التقييم (الزاوية اليمنى السفلية)
-              Positioned(
-                bottom: 15,
-                right: 15,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    children: [
-                      Text("0.0 (عدد المقيمين)", style: TextStyle(color: Colors.white, fontSize: 11)),
-                      SizedBox(width: 4),
-                      Icon(Icons.star, color: Colors.orange, size: 14),
-                    ],
-                  ),
-                ),
-              )
-            ],
-          ),
-          
-          // البيانات (الاسم والسعر)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end, // محاذاة لليمين
-              children: [
-                Text(
-                  product.name, 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  textDirection: TextDirection.rtl,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  product.price > 0 ? "سعر المنتج: ${product.price} دينار" : "سعر التوصيل: 00 دينار | ${product.description}",
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                  textDirection: TextDirection.rtl,
-                ),
-              ],
+              color: Colors.black87,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ودجت الفلتر (Chip)
+  Widget _buildFilterChip(String label, {bool isSelected = false}) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFF2DBA9D) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isSelected ? const Color(0xFF2DBA9D) : Colors.grey[300]!),
+        boxShadow: isSelected 
+            ? [BoxShadow(color: const Color(0xFF2DBA9D).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))] 
+            : [],
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.black54,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }

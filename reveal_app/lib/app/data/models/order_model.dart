@@ -6,6 +6,10 @@ class Order {
   final String createdAt;
   final List<OrderItem> items;
 
+  // --- الحقول الجديدة التي أضفناها لتصحيح الأخطاء ---
+  final String? cafeName; // اسم الكافيتيريا
+  final String? cafeLogo; // شعار الكافيتيريا
+
   Order({
     required this.id,
     required this.orderNumber,
@@ -13,6 +17,8 @@ class Order {
     required this.status,
     required this.createdAt,
     required this.items,
+    this.cafeName, // اختياري
+    this.cafeLogo, // اختياري
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -23,6 +29,10 @@ class Order {
       status: json['status'] ?? 'PENDING',
       createdAt: json['created_at'] ?? '',
       items: (json['items'] as List?)?.map((i) => OrderItem.fromJson(i)).toList() ?? [],
+      
+      // استقبال البيانات الجديدة من الباك اند (أو وضع قيم افتراضية)
+      cafeName: json['cafe_name'] ?? 'اسم الكافيتيريا', 
+      cafeLogo: json['cafe_logo'], 
     );
   }
 
@@ -48,11 +58,15 @@ class OrderItem {
   final int productId;
   final String productName;
   final int quantity;
+  
+  // --- حقل صورة المنتج الجديد ---
+  final String? productImage; 
 
   OrderItem({
     required this.productId,
     required this.productName,
     required this.quantity,
+    this.productImage, // اختياري
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -60,6 +74,8 @@ class OrderItem {
       productId: json['product_id'],
       productName: json['product_name'] ?? 'منتج',
       quantity: json['quantity'] ?? 1,
+      // استقبال صورة المنتج
+      productImage: json['product_image'], 
     );
   }
 }

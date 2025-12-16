@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/core/enums/view_state.dart';
 import 'package:reveal_app/app/data/providers/wallet_provider.dart';
-import 'package:reveal_app/app/presentation/widgets/my_drawer.dart'; // تأكد من مسار الـ Drawer
+import 'package:reveal_app/app/presentation/widgets/my_drawer.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -18,16 +18,16 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   void initState() {
     super.initState();
-    // جلب البيانات عند فتح الصفحة لأول مرة
+    // ✅ جلب البيانات باستخدام الاسم الصحيح للدالة
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<WalletProvider>(context, listen: false).fetchUserWallet();
+      context.read<WalletProvider>().fetchWalletData();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA), // لون خلفية رمادي فاتح جداً
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
           'المحفظة الإلكترونية',
@@ -37,12 +37,19 @@ class _WalletScreenState extends State<WalletScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
+        actions: [
+          IconButton(
+            // ✅ زر التحديث اليدوي
+            onPressed: () => context.read<WalletProvider>().fetchWalletData(),
+            icon: const Icon(Icons.refresh, color: Color(0xFF2DBA9D)),
+          ),
+        ],
       ),
       drawer: const MyDrawer(), // القائمة الجانبية
       body: Consumer<WalletProvider>(
         builder: (context, provider, child) {
           
-          // 1. حالة التحميل (Loading)
+          // 1. حالة التحميل
           if (provider.state == ViewState.busy) {
             return const Center(
               child: CircularProgressIndicator(color: Color(0xFF2DBA9D)),
@@ -59,13 +66,14 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   Icon(Icons.warning_amber_rounded, size: 80, color: Colors.grey[400]),
                   const SizedBox(height: 16),
-                  const Text(
-                    'لا يمكن الوصول لبيانات المحفظة',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  Text(
+                    provider.errorMessage ?? 'لا يمكن الوصول لبيانات المحفظة',
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
-                    onPressed: () => provider.fetchUserWallet(),
+                    // ✅ زر إعادة المحاولة
+                    onPressed: () => provider.fetchWalletData(),
                     icon: const Icon(Icons.refresh),
                     label: const Text('إعادة المحاولة'),
                     style: ElevatedButton.styleFrom(
@@ -78,9 +86,10 @@ class _WalletScreenState extends State<WalletScreen> {
             );
           }
 
-          // 3. حالة عرض البيانات (الواجهة الرئيسية)
+          // 3. حالة عرض البيانات
           return RefreshIndicator(
-            onRefresh: () async => await provider.fetchUserWallet(),
+            // ✅ السحب للتحديث
+            onRefresh: () async => await provider.fetchWalletData(),
             color: const Color(0xFF2DBA9D),
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -100,7 +109,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2DBA9D).withValues(alpha: 0.4),
+                          color: const Color(0xFF2DBA9D).withOpacity(0.4),
                           blurRadius: 15,
                           offset: const Offset(0, 8),
                         ),
@@ -120,11 +129,11 @@ class _WalletScreenState extends State<WalletScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                wallet.college, // ✅ عرض اسم الكلية
+                                wallet.college, 
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -167,9 +176,9 @@ class _WalletScreenState extends State<WalletScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
+                            color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                            border: Border.all(color: Colors.white.withOpacity(0.3)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -183,7 +192,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    wallet.linkCode, // ✅ عرض كود الربط
+                                    wallet.linkCode,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 18,
@@ -211,21 +220,28 @@ class _WalletScreenState extends State<WalletScreen> {
                         icon: Icons.add_card_rounded,
                         label: 'شحن',
                         onTap: () {
-                          // إضافة وظيفة الشحن مستقبلاً
+                          // إضافة وظيفة الشحن
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("سيتم تفعيل الشحن قريباً")),
+                          );
                         },
                       ),
                       _buildActionButton(
                         icon: Icons.history_rounded,
                         label: 'السجل',
                         onTap: () {
-                          // إضافة وظيفة السجل مستقبلاً
+                           ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("سجل العمليات قادم قريباً")),
+                          );
                         },
                       ),
                       _buildActionButton(
                         icon: Icons.send_rounded,
                         label: 'تحويل',
                         onTap: () {
-                          // إضافة وظيفة التحويل مستقبلاً
+                           ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("خدمة التحويل قادمة قريباً")),
+                          );
                         },
                       ),
                     ],
@@ -258,7 +274,7 @@ class _WalletScreenState extends State<WalletScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   blurRadius: 10,
                   spreadRadius: 2,
                 ),

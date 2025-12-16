@@ -3,23 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:reveal_app/app/data/models/college_model.dart';
+import 'package:reveal_app/app/data/models/order_model.dart';
 import 'package:reveal_app/app/data/models/product_model.dart';
 import 'package:reveal_app/app/data/models/wallet_model.dart';
-import 'package:reveal_app/app/data/models/order_model.dart';
 
 class ApiService {
-  // ✅ تم تحديث الرابط ليشير إلى استضافة PythonAnywhere
-  // هذا الرابط يعمل للويب وللأندرويد ولكل المنصات
-  static String get baseUrl {
-    return "https://RevealSystem.pythonanywhere.com";
-  }
-
+  static String get baseUrl => "https://RevealSystem.pythonanywhere.com";
   static const String _tokenKey = 'auth_token';
 
   // ---------------------------------------------------------------------------
-  // 1. إدارة التوكن (Token Management)
+  // Token helpers
   // ---------------------------------------------------------------------------
-
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey);
@@ -35,29 +29,39 @@ class ApiService {
     await prefs.remove(_tokenKey);
   }
 
-  Future<Map<String, String>> _getHeaders() async {
+  Future<Map<String, String>> _getHeaders({bool authRequired = false}) async {
     final token = await getToken();
+
+    if (authRequired && token == null) {
+      throw Exception('Authentication token is missing. Please login again.');
+    }
+
     return {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=UTF-8',
       if (token != null) 'Authorization': 'Token $token',
     };
   }
 
   // ---------------------------------------------------------------------------
-  // 2. المصادقة (Auth)
+  // Auth
   // ---------------------------------------------------------------------------
+  Future<Map<String, dynamic>> login(String emailOrPhone, String password) async {
+    final url = Uri.parse('$baseUrl/api/login');
+    debugPrint('[LOGIN] URL: $url');
 
-  // تسجيل الدخول
-  Future<Map<String, dynamic>> login(String phone, String password) async {
-    final url = Uri.parse('$baseUrl/api/auth/login/');
-    debugPrint('🔵 [LOGIN] URL: $url');
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        // إرسال phone_number بدلاً من email ليتوافق مع التعديلات
-        body: json.encode({'phone_number': phone, 'password': password}),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: json.encode({
+          'email': emailOrPhone,
+          'phone_number': emailOrPhone,
+          'password': password,
+        }),
       );
+
+      debugPrint('[LOGIN] Status: ${response.statusCode}');
+      debugPrint('[LOGIN] Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
@@ -66,23 +70,24 @@ class ApiService {
         }
         return data;
       } else {
-        throw Exception('بيانات الدخول غير صحيحة');
+        throw Exception('Invalid credentials or server error.');
       }
     } catch (e) {
-      debugPrint('❌ [LOGIN ERROR]: $e');
-      throw Exception('خطأ في الاتصال: $e');
+      throw Exception('Unable to login: $e');
     }
   }
 
-  // إنشاء حساب جديد
-  Future<Map<String, dynamic>> signup(String fullName, String phone, String password) async {
-    final url = Uri.parse('$baseUrl/api/auth/signup/');
+  Future<Map<String, dynamic>> signup(String fullName, String email, String phone, String password) async {
+    final url = Uri.parse('$baseUrl/api/signup');
+    debugPrint('[SIGNUP] URL: $url');
+
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: json.encode({
           'full_name': fullName,
+          'email': email,
           'phone_number': phone,
           'password': password,
         }),
@@ -96,164 +101,151 @@ class ApiService {
         return data;
       } else {
         final errorBody = json.decode(utf8.decode(response.bodyBytes));
-        String message = 'فشل إنشاء الحساب.';
-        if (errorBody is Map) {
-          if (errorBody.containsKey('username')) {
-             message = 'رقم الهاتف مستخدم بالفعل.';
-          } else if (errorBody.containsKey('phone_number')) {
-            message = 'رقم الهاتف: ${errorBody['phone_number'][0]}';
-          }
-        }
-        throw Exception(message);
+        throw Exception(errorBody['error'] ?? 'Could not create account.');
       }
     } catch (e) {
-      throw Exception('خطأ في الاتصال: $e');
+      throw Exception('Unable to signup: $e');
     }
   }
 
   Future<Map<String, dynamic>> getUserProfile() async {
-    final url = Uri.parse('$baseUrl/api/auth/user/');
-    debugPrint('👤 [GET USER PROFILE] URL: $url');
+    final url = Uri.parse('$baseUrl/api/user');
+
     try {
-      final headers = await _getHeaders();
+      final headers = await _getHeaders(authRequired: true);
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         return json.decode(utf8.decode(response.bodyBytes));
       } else {
-        throw Exception('فشل في جلب بيانات المستخدم: ${response.statusCode}');
+        throw Exception('Failed to load user profile.');
       }
     } catch (e) {
-      throw Exception('خطأ في الاتصال أثناء جلب بيانات المستخدم: $e');
+      throw Exception('Error while fetching profile: $e');
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 3. البيانات (Data)
+  // Data
   // ---------------------------------------------------------------------------
-  
   Future<List<College>> getCafes() async {
-    final url = Uri.parse('$baseUrl/api/cafes/');
-    debugPrint('🏫 [GET CAFES] URL: $url');
+    final url = Uri.parse('$baseUrl/api/cafes');
+    debugPrint('[GET CAFES] URL: $url');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final cafeData = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
         return cafeData.map((json) => College.fromJson(json)).toList();
       } else {
-        debugPrint('Server Error fetching cafes: ${response.statusCode}');
-        throw Exception('فشل تحميل الكافيتيريات من الخادم');
+        throw Exception('Failed to fetch cafes: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching cafes: $e');
-      throw Exception('حدث خطأ في الشبكة أثناء جلب الكافيتيريات.');
+      throw Exception('Error while fetching cafes: $e');
     }
   }
 
   Future<List<Product>> getProducts({String? collegeId}) async {
-    var urlString = '$baseUrl/api/products/';
+    final query = <String, String>{};
     if (collegeId != null && collegeId.isNotEmpty) {
-      urlString += '?college_id=$collegeId';
+      query['college_id'] = collegeId;
     }
-    final url = Uri.parse(urlString);
-    debugPrint('📦 [GET PRODUCTS] URL: $url');
+
+    final url = Uri.parse('$baseUrl/api/products/').replace(
+      queryParameters: query.isEmpty ? null : query,
+    );
+    debugPrint('[GET PRODUCTS] URL: $url');
+
     try {
-      final response = await http.get(url);
+      // Send the token if it exists so the backend can personalize results.
+      final headers = await _getHeaders();
+      final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final productData = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
-        return productData.map((json) {
-          String imagePath = json['image'] ?? '';
-          // إصلاح مسار الصورة في حال كان نسبياً
+        return productData.map((raw) {
+          final map = Map<String, dynamic>.from(raw as Map);
+          final imagePath = (map['image_url'] ?? map['image'] ?? '').toString();
+
           if (imagePath.isNotEmpty && !imagePath.startsWith('http')) {
-             // إزالة السلاش المكرر إن وجد
-            if (imagePath.startsWith('/')) {
-              imagePath = imagePath.substring(1);
-            }
-            json['image'] = '$baseUrl/$imagePath';
+            final normalized = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+            map['image_url'] = '$baseUrl/$normalized';
           }
-          return Product.fromJson(json);
+          return Product.fromJson(map);
         }).toList();
       } else {
-        debugPrint('Server Error: ${response.statusCode}');
-        throw Exception('فشل في جلب المنتجات من الخادم');
+        throw Exception('Failed to fetch products: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching products: $e');
-      throw Exception('خطأ في الاتصال بالشبكة أثناء جلب المنتجات.');
+      throw Exception('Error while fetching products: $e');
     }
   }
 
   Future<Wallet> getWallet() async {
     final url = Uri.parse('$baseUrl/api/wallet/');
-    debugPrint('💰 [GET WALLET] URL: $url');
+    debugPrint('[GET WALLET] URL: $url');
+
     try {
-      final headers = await _getHeaders();
+      final headers = await _getHeaders(authRequired: true);
       final response = await http.get(url, headers: headers);
+
+      debugPrint('[WALLET RESPONSE ${response.statusCode}]: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
         return Wallet.fromJson(data);
       } else {
-        debugPrint('Server Error fetching wallet: ${response.statusCode}');
-        throw Exception('فشل تحميل بيانات المحفظة.');
+        throw Exception('Failed to fetch wallet: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching wallet: $e');
-      throw Exception('حدث خطأ في الشبكة أثناء جلب محفظتك.');
+      throw Exception('Error while fetching wallet: $e');
     }
   }
 
   Future<bool> createOrder(double totalPrice, List<Map<String, dynamic>> items, String collegeId) async {
-    final url = Uri.parse('$baseUrl/api/orders/create/');
+    final url = Uri.parse('$baseUrl/api/orders/create');
     try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: json.encode({
-          'total_price': totalPrice,
-          'items': items,
-          'college': int.tryParse(collegeId),
-        }),
-      );
+      final headers = await _getHeaders(authRequired: true);
+      final body = json.encode({
+        'total_price': totalPrice,
+        'items': items,
+        'cafe_id': int.tryParse(collegeId) ?? 1,
+      });
 
-      if (response.statusCode == 201) {
+      final response = await http.post(url, headers: headers, body: body);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
         return true;
       } else {
         final errorBody = json.decode(utf8.decode(response.bodyBytes));
-        final errorMessage = errorBody['error'] ?? 'فشل في إنشاء الطلب. حاول مرة أخرى.';
-        throw Exception(errorMessage);
+        throw Exception(errorBody['error'] ?? 'Failed to create order.');
       }
     } catch (e) {
-      throw Exception('خطأ في الاتصال أثناء إنشاء الطلب: $e');
+      throw Exception('Error while creating order: $e');
     }
   }
 
   Future<List<Order>> getOrders() async {
-    final url = Uri.parse('$baseUrl/api/orders/list/');
-    debugPrint('🥡 [GET ORDERS] URL: $url');
+    final url = Uri.parse('$baseUrl/api/orders');
+    debugPrint('[GET ORDERS] URL: $url');
     try {
-      final headers = await _getHeaders();
+      final headers = await _getHeaders(authRequired: true);
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final orderData = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
         return orderData.map((json) => Order.fromJson(json)).toList();
       } else {
-        debugPrint('Server Error fetching orders: ${response.statusCode}');
-        throw Exception('فشل تحميل الطلبات من الخادم');
+        throw Exception('Failed to fetch orders: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching orders: $e');
-      throw Exception('خطأ في الشبكة أثناء جلب الطلبات.');
+      throw Exception('Error while fetching orders: $e');
     }
   }
 
   Future<bool> linkWalletWithCode(String linkCode) async {
-    final url = Uri.parse('$baseUrl/api/wallet/link/');
+    final url = Uri.parse('$baseUrl/api/wallet/link');
     try {
-      final headers = await _getHeaders();
+      final headers = await _getHeaders(authRequired: true);
       final response = await http.post(
         url,
         headers: headers,
@@ -263,10 +255,10 @@ class ApiService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception('الكود غير صحيح أو تم استخدامه من قبل.');
+        throw Exception('Unable to link wallet with the provided code.');
       }
     } catch (e) {
-      throw Exception('فشل ربط المحفظة: ${e.toString()}');
+      throw Exception('Error while linking wallet: $e');
     }
   }
 }

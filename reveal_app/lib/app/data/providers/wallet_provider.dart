@@ -14,20 +14,22 @@ class WalletProvider extends ChangeNotifier {
   ViewState get state => _state;
   String? get errorMessage => _errorMessage;
 
-  WalletProvider() {
-    fetchUserWallet();
-  }
-
-  Future<void> fetchUserWallet() async {
+  // --- هنا قمت بتغيير الاسم ليتطابق مع HomeScreen ---
+  // كان fetchUserWallet وأصبح fetchWalletData
+  Future<void> fetchWalletData() async {
     _state = ViewState.busy;
     notifyListeners();
+    
     try {
       _wallet = await _apiService.getWallet();
       _state = ViewState.idle;
+      _errorMessage = null; 
     } catch (e) {
-      _errorMessage = "فشل جلب المحفظة";
+      _errorMessage = "فشل جلب بيانات المحفظة: ${e.toString()}";
       _state = ViewState.error;
+      debugPrint("❌ Wallet Provider Error: $e");
     }
+    
     notifyListeners();
   }
 }

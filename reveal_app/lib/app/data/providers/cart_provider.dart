@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
-import '../models/cart_item_model.dart';
-import '../models/product_model.dart';
-import '../services/api_service.dart';
+import 'package:reveal_app/app/data/models/cart_item_model.dart';
+import 'package:reveal_app/app/data/models/product_model.dart';
+import 'package:reveal_app/app/data/services/api_service.dart';
 
-/// Exception thrown when attempting to mix products from different colleges.
 class MismatchedCollegeException implements Exception {
   final String message;
   MismatchedCollegeException(this.message);
-
   @override
   String toString() => message;
 }
 
 class CartProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
-
-  // Keyed by product ID (String)
   final Map<String, CartItem> _items = {};
 
   Map<String, CartItem> get items => _items;
@@ -37,16 +33,15 @@ class CartProvider extends ChangeNotifier {
   }
 
   void addItem(Product product) {
-    // Prevent mixing items from different colleges
-    if (_items.isNotEmpty && _items.values.first.collegeId != product.collegeId) {
+    if (_items.isNotEmpty &&
+        _items.values.first.collegeId != product.collegeId) {
       throw MismatchedCollegeException(
-        'لا يمكنك إضافة منتجات من كليات مختلفة في نفس السلة. يرجى إكمال الطلب الحالي أو إفراغ السلة أولاً.',
+        'Cannot mix items from different colleges.',
       );
     }
-
-    if (_items.containsKey(product.id.toString())) {
+    if (_items.containsKey(product.id)) {
       _items.update(
-        product.id.toString(),
+        product.id,
         (existing) => CartItem(
           id: existing.id,
           name: existing.name,
@@ -59,9 +54,9 @@ class CartProvider extends ChangeNotifier {
       );
     } else {
       _items.putIfAbsent(
-        product.id.toString(),
+        product.id,
         () => CartItem(
-          id: product.id.toString(),
+          id: product.id,
           name: product.name,
           price: product.price,
           imageUrl: product.imageUrl,
@@ -75,9 +70,7 @@ class CartProvider extends ChangeNotifier {
   }
 
   void removeSingleItem(String productId) {
-    if (!_items.containsKey(productId)) {
-      return;
-    }
+    if (!_items.containsKey(productId)) return;
     if (_items[productId]!.quantity > 1) {
       _items.update(
         productId,
@@ -108,24 +101,17 @@ class CartProvider extends ChangeNotifier {
   }
 
   Future<bool> checkout() async {
-    if (_items.isEmpty) {
-      return false;
-    }
-
-    final List<Map<String, dynamic>> orderItems = [];
+    if (_items.isEmpty) return false;
     final collegeId = _items.values.first.collegeId;
-
+    final List<Map<String, dynamic>> orderItems = [];
     _items.forEach((key, item) {
-      final productId = int.tryParse(item.id);
-      if (productId == null) {
-        throw FormatException('معرّف المنتج غير صالح: ${item.id}');
+      if (int.tryParse(item.id) != null) {
+        orderItems.add({
+          'product_id': int.parse(item.id),
+          'quantity': item.quantity,
+        });
       }
-      orderItems.add({
-        'product_id': productId,
-        'qty': item.quantity,
-      });
     });
-
     try {
       await _apiService.createOrder(totalAmount, orderItems, collegeId);
       clear();
@@ -135,4 +121,3 @@ class CartProvider extends ChangeNotifier {
     }
   }
 }
-

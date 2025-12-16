@@ -28,3 +28,5 @@ Thumbs.db
 .idea/
 
 reveal_dashboard/reveal_dashboard/firebase-credentials.json
+
+reveal_dashboard/reveal_dashboard/config/firebase-credentials.json

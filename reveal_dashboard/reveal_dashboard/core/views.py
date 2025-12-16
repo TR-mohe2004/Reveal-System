@@ -1,43 +1,53 @@
 ﻿from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
 from .models import Product, Cafe, Category, Order
 from users.models import User
 from wallet.models import Wallet, Transaction
 from .forms import ProductForm
-from .serializers import ProductSerializer, OrderSerializer, UserSerializer
+from .serializers import ProductSerializer, OrderSerializer, UserSerializer, WalletSerializer 
 
-# --- API للموبايل (محدث ومصحح) ---
+# --- API للموبايل (معدل ليقبل البيانات من التطبيق كما هي) ---
 
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_login(request):
-    # طباعة البيانات الواصلة للتشخيص
     print(f" [Login Attempt] Data Received: {request.data}")
     
-    email = request.data.get('email')
+    # 1. نستقبل البيانات سواء أرسلها التطبيق باسم 'phone_number' أو 'email'
+    raw_identifier = request.data.get('phone_number') or request.data.get('email')
     password = request.data.get('password')
     
-    if not email or not password:
-        print(" Missing email or password")
-        return Response({'error': 'الرجاء إدخال البريد وكلمة المرور'}, status=400)
+    if not raw_identifier or not password:
+        return Response({'error': 'الرجاء إدخال رقم الهاتف وكلمة المرور'}, status=400)
 
-    user = authenticate(email=email, password=password)
+    # 2. تنظيف رقم الهاتف (حذف الشرطات - والمسافات) ليتطابق مع قاعدة البيانات
+    # لأن التطبيق يرسل 091-5199569 ونحن نخزنه 0915199569
+    clean_phone = raw_identifier.replace('-', '').replace(' ', '')
+    
+    print(f" Trying to auth with: {clean_phone}") # للتأكد في السجل
+
+    # 3. محاولة الدخول
+    user = authenticate(username=clean_phone, password=password)
+
     if user is not None:
-        print(f" Login Success: {user.email}")
+        print(f" Login Success: {user.phone_number}")
+        token, _ = Token.objects.get_or_create(user=user)
         return Response({
-            'token': 'demo-token-123', 
-            'user': {'email': user.email, 'full_name': user.full_name}
+            'token': token.key, 
+            'user': {'phone_number': user.phone_number, 'full_name': user.full_name, 'email': user.email}
         })
     else:
         print(" Invalid Credentials")
-        return Response({'error': 'بيانات الدخول غير صحيحة'}, status=400)
+        return Response({'error': 'رقم الهاتف أو كلمة المرور غير صحيحة'}, status=400)
+
 
 @csrf_exempt
 @api_view(['POST'])
@@ -45,24 +55,32 @@ def api_login(request):
 def api_signup(request):
     print(f" [Signup Attempt] Data: {request.data}")
     
-    email = request.data.get('email')
+    # نستقبل البيانات بمرونة
+    raw_identifier = request.data.get('phone_number') or request.data.get('email')
     password = request.data.get('password')
     full_name = request.data.get('full_name')
-    phone_number = request.data.get('phone_number', '0000000000')
     
-    if User.objects.filter(email=email).exists():
-        return Response({'error': 'البريد الإلكتروني مسجل مسبقاً'}, status=400)
+    # تنظيف الرقم قبل الحفظ
+    if raw_identifier:
+        phone_number = raw_identifier.replace('-', '').replace(' ', '')
+    else:
+        return Response({'error': 'رقم الهاتف مطلوب'}, status=400)
+
+    # التحقق من التكرار
+    if User.objects.filter(phone_number=phone_number).exists():
+        return Response({'error': 'رقم الهاتف مسجل مسبقاً'}, status=400)
         
     try:
         user = User.objects.create_user(
-            email=email, 
+            phone_number=phone_number,
             password=password, 
-            full_name=full_name, 
-            phone_number=phone_number
+            full_name=full_name,
+            email="" # نتركه فارغاً
         )
+        token, _ = Token.objects.get_or_create(user=user)
         return Response({
-            'token': 'demo-token-123', 
-            'user': {'email': user.email, 'full_name': user.full_name}
+            'token': token.key, 
+            'user': {'phone_number': user.phone_number, 'full_name': user.full_name}
         }, status=201)
     except Exception as e:
         print(f" Signup Error: {e}")
@@ -71,22 +89,72 @@ def api_signup(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_products(request):
-    products = Product.objects.all().order_by('-created_at')
+    products = Product.objects.select_related('cafe', 'category').order_by('-created_at')
+
+    category_id = request.GET.get('category_id')
+    category_name = request.GET.get('category') or request.GET.get('category_name')
+    cafe_id = request.GET.get('cafe_id')
+    college_id = request.GET.get('college_id')
+    available_only = request.GET.get('available')
+
+    if category_id:
+        products = products.filter(category_id=category_id)
+    elif category_name:
+        products = products.filter(category__name__iexact=category_name)
+
+    if cafe_id:
+        products = products.filter(cafe_id=cafe_id)
+
+    if college_id:
+        # Allow filtering by the college value stored on the cafe owner's wallet
+        products = products.filter(cafe__owner__wallet__college__icontains=college_id)
+
+    if available_only and available_only.lower() in ['1', 'true', 'yes']:
+        products = products.filter(is_available=True)
+
     serializer = ProductSerializer(products, many=True, context={'request': request})
     return Response(serializer.data)
 
 @api_view(['GET'])
-@permission_classes([AllowAny]) # جعلناها عامة للتجربة
+@permission_classes([AllowAny])
 def get_wallet(request):
-    # محاولة جلب محفظة للتجربة
-    wallet = Wallet.objects.first()
+    wallet = None
+    user = request.user if request.user.is_authenticated else None
+
+    # Try Token auth manually if DRF auth didn't populate request.user
+    if not user:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Token '):
+            token_key = auth_header.split(' ', 1)[1]
+            try:
+                user = Token.objects.select_related('user').get(key=token_key).user
+            except Token.DoesNotExist:
+                user = None
+
+    # Fallback to identifiers passed explicitly
+    if not user:
+        phone = request.GET.get('phone_number') or request.GET.get('phone')
+        user_id = request.GET.get('user_id')
+
+        if phone:
+            cleaned = phone.replace('-', '').replace(' ', '')
+            user = User.objects.filter(phone_number=cleaned).first()
+        elif user_id:
+            user = User.objects.filter(id=user_id).first()
+
+    if user:
+        wallet = Wallet.objects.filter(user=user).first()
+
+    if not wallet:
+        link_code = request.GET.get('link_code')
+        if link_code:
+            wallet = Wallet.objects.filter(link_code=link_code).first()
+
     if wallet:
-        return Response({
-            'id': wallet.id,
-            'balance': wallet.balance,
-            'updated_at': wallet.updated_at
-        })
-    return Response({'balance': 0.0})
+        serializer = WalletSerializer(wallet, context={'request': request})
+        return Response(serializer.data)
+
+    return Response({'balance': 0.0, 'currency': 'LYD'}, status=404)
 
 @csrf_exempt
 @api_view(['POST'])
@@ -96,18 +164,27 @@ def create_order(request):
     return Response({'message': 'تم استلام الطلب', 'order_id': 123}, status=201)
 
 
-# --- صفحات المنظومة (كما هي) ---
+# --- صفحات المنظومة (لوحة الإدارة) ---
 def custom_login(request):
     if request.user.is_authenticated:
         return redirect('core:dashboard')
+    
     if request.method == 'POST':
-        email = request.POST.get('email')
+        username = request.POST.get('username') 
         password = request.POST.get('password')
-        user = authenticate(request, email=email, password=password)
+        
+        # تنظيف الرقم هنا أيضاً للاحتياط
+        if username:
+            username = username.replace('-', '').replace(' ', '')
+
+        user = authenticate(request, username=username, password=password) 
+
         if user:
             login(request, user)
             return redirect('core:dashboard')
-        return render(request, 'login.html', {'error': 'بيانات غير صحيحة'})
+        else:
+            return render(request, 'login.html', {'error': 'بيانات الدخول غير صحيحة'})
+            
     return render(request, 'login.html')
 
 def custom_logout(request):
@@ -165,8 +242,12 @@ def add_product(request):
         form = ProductForm(request.POST)
         if form.is_valid():
             p = form.save(commit=False)
-            p.cafe = Cafe.objects.first()
-            p.save()
+            cafe = Cafe.objects.first()
+            if cafe:
+                p.cafe = cafe
+                p.save()
+            else:
+                pass 
     return redirect('core:products')
 
 @login_required(login_url='core:login')
@@ -197,4 +278,4 @@ def ready_order(request, order_id):
 def complete_order(request, order_id):
     Order.objects.filter(id=order_id).update(status='COMPLETED')
     return redirect('core:orders')
-def manifest(request): return JsonResponse({}, safe=False)
+def manifest(request): return JsonResponse({}, safe=False)      

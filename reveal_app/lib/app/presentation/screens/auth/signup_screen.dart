@@ -10,7 +10,9 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  // 1. إضافة المتحكم الخاص بالإيميل
   final _nameController = TextEditingController();
+  final _emailController = TextEditingController(); // ✅ جديد
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -19,6 +21,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _emailController.dispose(); // ✅ تنظيف الذاكرة
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -33,8 +36,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
+    // 2. إرسال الإيميل مع البيانات
     final success = await authProvider.signup(
       _nameController.text.trim(),
+      _emailController.text.trim(), // ✅ تم تمرير الإيميل هنا
       _phoneController.text.trim(),
       _passwordController.text.trim(),
     );
@@ -102,6 +107,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   const SizedBox(height: 30),
+
+                  // --- حقل الاسم ---
                   _buildLabel("الإسم واللقب"),
                   _buildTextField(
                     controller: _nameController,
@@ -114,6 +121,25 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 20),
+
+                  // --- 3. حقل البريد الإلكتروني (جديد) ---
+                  _buildLabel("البريد الإلكتروني"), // ✅
+                  _buildTextField(
+                    controller: _emailController,
+                    hintText: "example@gmail.com",
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'الرجاء إدخال البريد الإلكتروني';
+                      }
+                      if (!value.contains('@')) {
+                        return 'الرجاء إدخال بريد إلكتروني صحيح';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
+                  // --- حقل الهاتف ---
                   _buildLabel("رقم الهاتف"),
                   TextFormField(
                     controller: _phoneController,
@@ -145,6 +171,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 20),
+
+                  // --- حقل كلمة السر ---
                   _buildLabel("كلمة السر"),
                   TextFormField(
                     controller: _passwordController,
@@ -174,6 +202,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 15),
+
                   const Center(
                     child: Text(
                       "عن طريق المتابعة، أنا أوافق على شروط وقواعد الإستخدام",
@@ -182,6 +211,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // زر الإنشاء
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -203,6 +234,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   const SizedBox(height: 30),
+
+                  // فاصل جوجل
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -214,6 +247,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
+                  
+                  // أيقونة جوجل
                   Center(
                     child: Image.network(
                       'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
