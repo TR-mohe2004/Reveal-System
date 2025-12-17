@@ -3,6 +3,11 @@ from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib import messages
+from django.conf import settings
+from django.db import transaction
+from django.db.models import Q
+from decimal import Decimal
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -231,7 +236,23 @@ def wallet_list(request):
     wallets = Wallet.objects.all()
     return render(request, 'core/wallet.html', {'wallets': wallets})
 @login_required(login_url='core:login')
-def wallet_recharge(request): return render(request, 'core/wallet_recharge.html')
+def wallet_recharge(request):
+    search_query = request.GET.get('q', '').strip()
+    wallets = Wallet.objects.select_related('user').all().order_by('-updated_at')
+
+    if search_query:
+        wallets = wallets.filter(
+            Q(user__full_name__icontains=search_query) |
+            Q(user__email__icontains=search_query) |
+            Q(user__phone_number__icontains=search_query) |
+            Q(link_code__icontains=search_query)
+        )
+
+    context = {
+        'wallets': wallets,
+        'min_charge_amount': getattr(settings, 'MIN_CHARGE_AMOUNT', 1.0),
+    }
+    return render(request, 'core/wallet_recharge.html', context)
 @login_required(login_url='core:login')
 def wallet_history(request): return render(request, 'core/wallet_history.html')
 
@@ -263,9 +284,78 @@ def delete_user(request, user_id): return redirect('core:customers')
 @login_required(login_url='core:login')
 def create_wallet(request): return redirect('core:wallet_recharge')
 @login_required(login_url='core:login')
-def charge_wallet(request): return redirect('core:wallet_recharge')
+def charge_wallet(request):
+    if request.method != 'POST':
+        return redirect('core:wallet_recharge')
+
+    wallet_id = request.POST.get('wallet_code') or request.POST.get('wallet_id')
+    amount_raw = request.POST.get('amount', '0')
+
+    try:
+        amount = Decimal(amount_raw)
+    except Exception:
+        messages.error(request, "المبلغ غير صالح.")
+        return redirect('core:wallet_recharge')
+
+    min_amount = Decimal(str(getattr(settings, 'MIN_CHARGE_AMOUNT', 1.0)))
+    wallet = get_object_or_404(Wallet.objects.select_related('user'), id=wallet_id)
+
+    if amount < min_amount:
+        messages.error(request, f"الحد الأدنى للشحن هو {min_amount} د.ل")
+        return redirect('core:wallet_recharge')
+
+    try:
+        with transaction.atomic():
+            Transaction.objects.create(
+                wallet=wallet,
+                amount=amount,
+                transaction_type='DEPOSIT',
+                source='SYSTEM',
+                description=f"شحن من اللوحة بواسطة {request.user}"
+            )
+        messages.success(request, f"تم شحن محفظة {wallet.user.full_name} بمبلغ {amount} د.ل")
+    except Exception as e:
+        messages.error(request, f"تعذر الشحن: {e}")
+
+    return redirect('core:wallet_recharge')
 @login_required(login_url='core:login')
-def refund_wallet(request): return redirect('core:wallet_recharge')
+def refund_wallet(request):
+    if request.method != 'POST':
+        return redirect('core:wallet_recharge')
+
+    wallet_id = request.POST.get('wallet_code') or request.POST.get('wallet_id')
+    amount_raw = request.POST.get('amount', '0')
+
+    try:
+        amount = Decimal(amount_raw)
+    except Exception:
+        messages.error(request, "المبلغ غير صالح.")
+        return redirect('core:wallet_recharge')
+
+    wallet = get_object_or_404(Wallet.objects.select_related('user'), id=wallet_id)
+
+    if amount <= 0:
+        messages.error(request, "يجب أن يكون المبلغ أكبر من صفر.")
+        return redirect('core:wallet_recharge')
+
+    if wallet.balance < amount:
+        messages.error(request, "الرصيد غير كافٍ لتنفيذ الخصم.")
+        return redirect('core:wallet_recharge')
+
+    try:
+        with transaction.atomic():
+            Transaction.objects.create(
+                wallet=wallet,
+                amount=amount,
+                transaction_type='WITHDRAWAL',
+                source='SYSTEM',
+                description=f"خصم من اللوحة بواسطة {request.user}"
+            )
+        messages.success(request, f"تم خصم {amount} د.ل من محفظة {wallet.user.full_name}")
+    except Exception as e:
+        messages.error(request, f"تعذر الخصم: {e}")
+
+    return redirect('core:wallet_recharge')
 @login_required(login_url='core:login')
 def accept_order(request, order_id):
     Order.objects.filter(id=order_id).update(status='PREPARING')

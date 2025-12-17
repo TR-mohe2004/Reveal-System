@@ -55,7 +55,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 class CafeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cafe
-        fields = ['id', 'name', 'image', 'is_active']
+        fields = ['id', 'name', 'image']
 
 
 class CategorySerializer(serializers.ModelSerializer):
