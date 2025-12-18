@@ -1,18 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// ✅ استيراد المودلز الجديدة الصحيحة
 import 'package:reveal_app/app/data/models/college_model.dart';
 import 'package:reveal_app/app/data/models/order_model.dart';
 import 'package:reveal_app/app/data/models/product_model.dart';
 import 'package:reveal_app/app/data/models/wallet_model.dart';
+import 'package:reveal_app/app/data/models/user_model.dart' as app_user; // تفادي التعارض مع Firebase User
 
 class ApiService {
+  // الرابط الحقيقي للسيرفر
   static String get baseUrl => "https://RevealSystem.pythonanywhere.com";
   static const String _tokenKey = 'auth_token';
 
   // ---------------------------------------------------------------------------
-  // Token helpers
+  // 🔐 إدارة التوكن (Token Helpers)
   // ---------------------------------------------------------------------------
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -29,24 +34,31 @@ class ApiService {
     await prefs.remove(_tokenKey);
   }
 
-  Future<Map<String, String>> _getHeaders({bool authRequired = false}) async {
-    final token = await getToken();
+  // بناء الهيدرز (Headers) تلقائياً مع التوكن
+  Future<Map<String, String>> _getHeaders({bool authRequired = false, bool useFirebaseToken = false}) async {
+    String? token;
+    if (useFirebaseToken) {
+      final user = FirebaseAuth.instance.currentUser;
+      token = await user?.getIdToken();
+    } else {
+      token = await getToken();
+    }
 
     if (authRequired && token == null) {
-      throw Exception('Authentication token is missing. Please login again.');
+      throw Exception('جلسة العمل انتهت، يرجى تسجيل الدخول مجدداً.');
     }
 
     return {
       'Content-Type': 'application/json; charset=UTF-8',
-      if (token != null) 'Authorization': 'Token $token',
+      if (token != null) 'Authorization': useFirebaseToken ? 'Bearer $token' : 'Token $token',
     };
   }
 
   // ---------------------------------------------------------------------------
-  // Auth
+  // 👤 المصادقة (Auth)
   // ---------------------------------------------------------------------------
   Future<Map<String, dynamic>> login(String emailOrPhone, String password) async {
-    final url = Uri.parse('$baseUrl/api/login');
+    final url = Uri.parse('$baseUrl/api/login/'); // تأكد من الـ Slash في النهاية إذا كان Django
     debugPrint('[LOGIN] URL: $url');
 
     try {
@@ -54,14 +66,12 @@ class ApiService {
         url,
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: json.encode({
-          'email': emailOrPhone,
-          'phone_number': emailOrPhone,
+          'username': emailOrPhone, // الباك إند عادة يتوقع username
           'password': password,
         }),
       );
 
       debugPrint('[LOGIN] Status: ${response.statusCode}');
-      debugPrint('[LOGIN] Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
@@ -70,17 +80,16 @@ class ApiService {
         }
         return data;
       } else {
-        throw Exception('Invalid credentials or server error.');
+        throw Exception('بيانات الدخول غير صحيحة.');
       }
     } catch (e) {
-      throw Exception('Unable to login: $e');
+      throw Exception('فشل تسجيل الدخول: $e');
     }
   }
 
   Future<Map<String, dynamic>> signup(String fullName, String email, String phone, String password) async {
-    final url = Uri.parse('$baseUrl/api/signup');
-    debugPrint('[SIGNUP] URL: $url');
-
+    final url = Uri.parse('$baseUrl/api/signup/');
+    
     try {
       final response = await http.post(
         url,
@@ -101,50 +110,63 @@ class ApiService {
         return data;
       } else {
         final errorBody = json.decode(utf8.decode(response.bodyBytes));
-        throw Exception(errorBody['error'] ?? 'Could not create account.');
+        throw Exception(errorBody['error'] ?? 'فشل إنشاء الحساب.');
       }
     } catch (e) {
-      throw Exception('Unable to signup: $e');
+      throw Exception('حدث خطأ أثناء التسجيل: $e');
     }
   }
 
-  Future<Map<String, dynamic>> getUserProfile() async {
-    final url = Uri.parse('$baseUrl/api/user');
+  // ✅ جلب بروفايل المستخدم كـ UserModel
+  Future<app_user.User> getUserProfile() async {
+    final url = Uri.parse('$baseUrl/api/user/'); // أو /profile/
 
     try {
       final headers = await _getHeaders(authRequired: true);
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
-        return json.decode(utf8.decode(response.bodyBytes));
+        final data = json.decode(utf8.decode(response.bodyBytes));
+        return app_user.User.fromJson(data);
       } else {
-        throw Exception('Failed to load user profile.');
+        throw Exception('فشل تحميل بيانات المستخدم.');
       }
     } catch (e) {
-      throw Exception('Error while fetching profile: $e');
+      throw Exception('خطأ في جلب البروفايل: $e');
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Data
+  // 📦 البيانات الأساسية (Data)
   // ---------------------------------------------------------------------------
-  Future<List<College>> getCafes() async {
-    final url = Uri.parse('$baseUrl/api/cafes');
+  
+  // ✅ جلب الكليات (CollegeModel)
+  Future<List<CollegeModel>> getCafes() async {
+    final url = Uri.parse('$baseUrl/api/colleges/'); // تأكد من الرابط الصحيح (cafes أو colleges)
     debugPrint('[GET CAFES] URL: $url');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        final cafeData = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
-        return cafeData.map((json) => College.fromJson(json)).toList();
+        final List<dynamic> cafeData = json.decode(utf8.decode(response.bodyBytes));
+        
+        return cafeData.map((json) {
+           // معالجة الصور إذا كانت ناقصة
+           if (json['image'] != null && !json['image'].toString().startsWith('http')) {
+             json['image'] = '$baseUrl${json['image']}';
+           }
+           return CollegeModel.fromJson(json);
+        }).toList();
+
       } else {
-        throw Exception('Failed to fetch cafes: ${response.statusCode}');
+        throw Exception('فشل جلب قائمة الكليات: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error while fetching cafes: $e');
+      throw Exception('خطأ في الاتصال: $e');
     }
   }
 
-  Future<List<Product>> getProducts({String? collegeId}) async {
+  // ✅ جلب المنتجات (ProductModel)
+  Future<List<ProductModel>> getProducts({String? collegeId}) async {
     final query = <String, String>{};
     if (collegeId != null && collegeId.isNotEmpty) {
       query['college_id'] = collegeId;
@@ -153,99 +175,62 @@ class ApiService {
     final url = Uri.parse('$baseUrl/api/products/').replace(
       queryParameters: query.isEmpty ? null : query,
     );
+    
     debugPrint('[GET PRODUCTS] URL: $url');
 
     try {
-      // Send the token if it exists so the backend can personalize results.
-      final headers = await _getHeaders();
+      final headers = await _getHeaders(); // نرسل التوكن إن وجد لتخصيص النتائج (مثل المفضلة)
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
-        final productData = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+        final List<dynamic> productData = json.decode(utf8.decode(response.bodyBytes));
+        
         return productData.map((raw) {
           final map = Map<String, dynamic>.from(raw as Map);
+          
+          // 🔥 إصلاح روابط الصور القادمة من دجانغو
           final imagePath = (map['image_url'] ?? map['image'] ?? '').toString();
-
           if (imagePath.isNotEmpty && !imagePath.startsWith('http')) {
-            final normalized = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-            map['image_url'] = '$baseUrl/$normalized';
+            final normalized = imagePath.startsWith('/') ? imagePath : '/$imagePath';
+            map['image_url'] = '$baseUrl$normalized';
           }
-          return Product.fromJson(map);
+          
+          return ProductModel.fromJson(map);
         }).toList();
       } else {
-        throw Exception('Failed to fetch products: ${response.statusCode}');
+        throw Exception('فشل تحميل المنتجات: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error while fetching products: $e');
+      throw Exception('خطأ أثناء جلب المنتجات: $e');
     }
   }
 
-  Future<Wallet> getWallet() async {
+  // ✅ جلب المحفظة (WalletModel)
+  Future<WalletModel> getWallet() async {
     final url = Uri.parse('$baseUrl/api/wallet/');
     debugPrint('[GET WALLET] URL: $url');
 
     try {
-      final headers = await _getHeaders(authRequired: true);
+      final headers = await _getHeaders(authRequired: true, useFirebaseToken: true);
       final response = await http.get(url, headers: headers);
-
-      debugPrint('[WALLET RESPONSE ${response.statusCode}]: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
-        return Wallet.fromJson(data);
+        return WalletModel.fromJson(data);
       } else {
-        throw Exception('Failed to fetch wallet: ${response.statusCode}');
+        throw Exception('فشل جلب المحفظة: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error while fetching wallet: $e');
+      throw Exception('خطأ في المحفظة: $e');
     }
   }
 
-  Future<bool> createOrder(double totalPrice, List<Map<String, dynamic>> items, String collegeId) async {
-    final url = Uri.parse('$baseUrl/api/orders/create');
-    try {
-      final headers = await _getHeaders(authRequired: true);
-      final body = json.encode({
-        'total_price': totalPrice,
-        'items': items,
-        'cafe_id': int.tryParse(collegeId) ?? 1,
-      });
-
-      final response = await http.post(url, headers: headers, body: body);
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return true;
-      } else {
-        final errorBody = json.decode(utf8.decode(response.bodyBytes));
-        throw Exception(errorBody['error'] ?? 'Failed to create order.');
-      }
-    } catch (e) {
-      throw Exception('Error while creating order: $e');
-    }
-  }
-
-  Future<List<Order>> getOrders() async {
-    final url = Uri.parse('$baseUrl/api/orders');
-    debugPrint('[GET ORDERS] URL: $url');
-    try {
-      final headers = await _getHeaders(authRequired: true);
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final orderData = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
-        return orderData.map((json) => Order.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to fetch orders: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error while fetching orders: $e');
-    }
-  }
-
+  // ✅ ربط المحفظة بالكود
   Future<bool> linkWalletWithCode(String linkCode) async {
-    final url = Uri.parse('$baseUrl/api/wallet/link');
+    final url = Uri.parse('$baseUrl/api/wallet/link/');
     try {
-      final headers = await _getHeaders(authRequired: true);
+      final headers = await _getHeaders(authRequired: true, useFirebaseToken: true);
+      
       final response = await http.post(
         url,
         headers: headers,
@@ -255,10 +240,58 @@ class ApiService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception('Unable to link wallet with the provided code.');
+        final body = json.decode(utf8.decode(response.bodyBytes));
+        throw Exception(body['error'] ?? 'الكود غير صحيح أو مستخدم مسبقاً.');
       }
     } catch (e) {
-      throw Exception('Error while linking wallet: $e');
+      throw Exception('خطأ أثناء الربط: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 🛒 الطلبات (Orders)
+  // ---------------------------------------------------------------------------
+  
+  Future<bool> createOrder(double totalPrice, List<Map<String, dynamic>> items, String collegeId) async {
+    final url = Uri.parse('$baseUrl/api/purchase/'); // أو /orders/create/
+    try {
+      final headers = await _getHeaders(authRequired: true, useFirebaseToken: true);
+      
+      final body = json.encode({
+        'total_price': totalPrice,
+        'items': items,
+        'college_id': collegeId, // نرسل الـ ID كنص أو رقم حسب الباك إند
+      });
+
+      final response = await http.post(url, headers: headers, body: body);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return true;
+      } else {
+        final errorBody = json.decode(utf8.decode(response.bodyBytes));
+        throw Exception(errorBody['error'] ?? 'فشل إنشاء الطلب.');
+      }
+    } catch (e) {
+      throw Exception('خطأ أثناء الطلب: $e');
+    }
+  }
+
+  // ✅ جلب سجل الطلبات (OrderModel)
+  Future<List<OrderModel>> getOrders() async {
+    final url = Uri.parse('$baseUrl/api/orders/');
+    
+    try {
+      final headers = await _getHeaders(authRequired: true);
+      final response = await http.get(url, headers: headers);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> orderData = json.decode(utf8.decode(response.bodyBytes));
+        return orderData.map((json) => OrderModel.fromJson(json)).toList();
+      } else {
+        throw Exception('فشل جلب الطلبات: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('خطأ في سجل الطلبات: $e');
     }
   }
 }

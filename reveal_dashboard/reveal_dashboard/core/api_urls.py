@@ -2,7 +2,8 @@ from django.urls import path, include
 from . import api_views
 
 urlpatterns = [
-    path('cafes/', api_views.get_cafes, name='api_get_cafes'),
+    path('cafes/', api_views.get_cafes_list, name='api_get_cafes'),
+    path('cafes/list/', api_views.get_cafes_list, name='api_get_cafes_list'),
     path('products/', api_views.get_products, name='api_products'),
     path('orders', api_views.orders_endpoint, name='api_orders'),
     path('orders/', api_views.orders_endpoint, name='api_orders_slash'),

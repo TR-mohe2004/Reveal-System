@@ -1,21 +1,20 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:reveal_app/app/core/enums/view_state.dart';
-import 'package:reveal_app/app/data/models/wallet_model.dart';
+import 'package:reveal_app/app/data/models/wallet_model.dart'; // ✅ المودل الجديد
 import 'package:reveal_app/app/data/services/api_service.dart';
 
 class WalletProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
 
-  Wallet? _wallet;
+  WalletModel? _wallet; // ✅ استخدام WalletModel
   ViewState _state = ViewState.idle;
   String? _errorMessage;
 
-  Wallet? get wallet => _wallet;
+  WalletModel? get wallet => _wallet;
   ViewState get state => _state;
   String? get errorMessage => _errorMessage;
 
-  // --- هنا قمت بتغيير الاسم ليتطابق مع HomeScreen ---
-  // كان fetchUserWallet وأصبح fetchWalletData
+  // تم توحيد الاسم ليكون fetchWalletData ليتطابق مع باقي الكود
   Future<void> fetchWalletData() async {
     _state = ViewState.busy;
     notifyListeners();

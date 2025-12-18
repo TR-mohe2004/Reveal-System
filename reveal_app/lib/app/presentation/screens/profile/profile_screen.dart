@@ -1,6 +1,8 @@
-﻿import 'dart:io'; // للتعامل مع ملفات الصور
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // مكتبة اختيار الصور
+﻿import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:reveal_app/app/data/services/api_service.dart';
+// ✅ استخدام المودل العام
+import 'package:reveal_app/app/data/models/user_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,188 +12,135 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // 1. تعريف المتغيرات لحفظ البيانات
-  bool isEditing = false; // هل نحن في وضع التعديل أم العرض؟
-  File? _profileImage; // لحفظ الصورة المختارة من الاستوديو
+  bool isLoading = true;
+  User? userProfile; // استخدام UserModel العام
+  final ApiService _apiService = ApiService();
 
-  // 2. تعريف المتحكمات (Controllers) لربط النصوص بالخانات
-  final TextEditingController _nameController = TextEditingController(text: "أحمد سليمان");
-  final TextEditingController _phoneController = TextEditingController(text: "091-5016621");
-  final TextEditingController _addressController = TextEditingController(text: "طرابلس، ليبيا");
-  final TextEditingController _emailController = TextEditingController(text: "ahmed@reveal.com");
+  final Color tealColor = const Color(0xFF009688);
 
-  // دالة لاختيار الصورة من المعرض
-  Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _profileImage = File(pickedFile.path);
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    fetchUserProfile();
   }
 
-  // دالة لحفظ البيانات (أو التبديل بين الوضعين)
-  void _toggleEdit() {
-    setState(() {
-      if (isEditing) {
-        // هنا يمكنك إضافة كود إرسال البيانات للسيرفر (API) لاحقاً
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم حفظ التعديلات بنجاح ✅"), backgroundColor: Colors.green),
-        );
+  Future<void> fetchUserProfile() async {
+    try {
+      // محاولة جلب البيانات من السيرفر
+      final user = await _apiService.getUserProfile();
+      if (mounted) {
+        setState(() {
+          userProfile = user;
+          isLoading = false;
+        });
       }
-      isEditing = !isEditing; // عكس الحالة
-    });
+    } catch (e) {
+      // إذا فشل السيرفر، نستخدم بيانات الفايربيز المؤقتة
+      final fbUser = auth.FirebaseAuth.instance.currentUser;
+      if (mounted) {
+        setState(() {
+          if (fbUser != null) {
+            // ✅ إنشاء كائن User يدوياً مع معالجة القيم الفارغة
+            userProfile = User(
+              id: 0,
+              fullName: fbUser.displayName ?? "مستخدم التطبيق",
+              email: fbUser.email ?? "no-email",
+              phoneNumber: fbUser.phoneNumber ?? "غير متوفر",
+              profileImage: fbUser.photoURL,
+            );
+          }
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF009688);
+    // صورة افتراضية
+    const defaultImage = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+    const headerImage = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&q=80";
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // --- القسم العلوي: الصورة والغلاف ---
-            Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                // الغلاف الخلفي
-                Container(
-                  height: 220,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    image: const DecorationImage(
-                      image: AssetImage('assets/images/welcome_bg.png'),
-                      fit: BoxFit.cover,
-                      opacity: 0.4,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(40),
-                      bottomRight: Radius.circular(40),
-                    ),
-                  ),
-                ),
-
-                // الصورة الشخصية (القابلة للتغيير)
-                Positioned(
-                  bottom: -50,
-                  child: GestureDetector(
-                    onTap: isEditing ? _pickImage : null, // السماح بالضغط فقط عند التعديل
-                    child: Stack(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                          child: CircleAvatar(
-                            radius: 65,
-                            backgroundColor: Colors.grey[200],
-                            backgroundImage: _profileImage != null
-                                ? FileImage(_profileImage!) as ImageProvider // عرض الصورة الجديدة
-                                : const AssetImage('assets/images/logo.png'), // عرض الصورة الافتراضية
-                          ),
-                        ),
-                        // أيقونة الكاميرا تظهر فقط في وضع التعديل
-                        if (isEditing)
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
-                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // زر الرجوع أو العنوان
-                Positioned(
-                  top: 50,
-                  child: const Text(
-                    "ملفي الشخصي",
-                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 70),
-
-            // --- قسم البيانات ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white, elevation: 0,
+        automaticallyImplyLeading: false,
+        actions: [
+           Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu, color: Colors.black), onPressed: () => Scaffold.of(context).openDrawer())),
+        ],
+        title: const Align(alignment: Alignment.centerRight, child: Text("حسابي", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
+      ),
+      drawer: const Drawer(child: Center(child: Text("القائمة الجانبية"))),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator(color: tealColor))
+          : userProfile == null 
+             ? const Center(child: Text("يجب تسجيل الدخول"))
+             : SingleChildScrollView(
               child: Column(
                 children: [
-                  // زر التعديل / الحفظ
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Stack(
+                    alignment: Alignment.center, clipBehavior: Clip.none,
                     children: [
-                      const Text("المعلومات الشخصية", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      TextButton.icon(
-                        onPressed: _toggleEdit,
-                        icon: Icon(isEditing ? Icons.check : Icons.edit, color: primaryColor),
-                        label: Text(isEditing ? "حفظ" : "تعديل", style: TextStyle(color: primaryColor)),
+                      Container(
+                        height: 140, margin: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          image: const DecorationImage(image: NetworkImage(headerImage), fit: BoxFit.cover),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: -50,
+                        child: CircleAvatar(
+                          radius: 54, backgroundColor: Colors.white,
+                          child: CircleAvatar(
+                            radius: 50,
+                            backgroundImage: NetworkImage(userProfile!.profileImage ?? defaultImage),
+                          ),
+                        ),
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 10),
-
-                  // حقول الإدخال (تتغير حسب الوضع)
-                  _buildEditableCard("الاسم واللقب", _nameController, Icons.person, isEditing),
-                  _buildEditableCard("رقم الهاتف", _phoneController, Icons.phone, isEditing, isNumber: true),
-                  _buildEditableCard("العنوان", _addressController, Icons.location_on, isEditing),
-                  _buildEditableCard("البريد الإلكتروني", _emailController, Icons.email, isEditing),
-
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 60),
+                  
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        _buildInfoCard("الإسم واللقب", userProfile!.fullName, Icons.person),
+                        _buildInfoCard("رقم الهاتف", userProfile!.phoneNumber, Icons.phone),
+                        _buildInfoCard("البريد الإلكتروني", userProfile!.email, Icons.email),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
-  // ودجت ذكي: يتحول من نص عادي إلى حقل إدخال
-  Widget _buildEditableCard(String label, TextEditingController controller, IconData icon, bool isEdit, {bool isNumber = false}) {
+  Widget _buildInfoCard(String label, String value, IconData icon) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(5),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5)),
-        ],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
       ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: const Color(0xFF009688).withOpacity(0.1), shape: BoxShape.circle),
-          child: Icon(icon, color: const Color(0xFF009688)),
-        ),
-        title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        subtitle: isEdit
-            ? TextFormField(
-                controller: controller,
-                keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
-                decoration: const InputDecoration(
-                  border: UnderlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 5),
-                ),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-              )
-            : Text(
-                controller.text, // عرض النص المحفوظ
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-              ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: tealColor),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ],
       ),
     );
   }

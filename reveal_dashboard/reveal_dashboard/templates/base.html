@@ -1,4 +1,4 @@
-﻿{% load static %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -21,14 +21,17 @@
 <body>
     <div class="d-flex" id="wrapper">
         <div id="sidebar-wrapper">
-            <div class="sidebar-heading"><i class="fas fa-rocket me-2"></i> منظومة ريفيل</div>
+            <div class="sidebar-heading">
+                <i class="fas fa-rocket me-2"></i>
+                {{ cafe_name|default:request.user.my_cafe.name|default:user.full_name }}
+            </div>
             <div class="list-group list-group-flush">
                 <a href="{% url 'core:dashboard' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><i class="fas fa-tachometer-alt fa-fw me-3"></i>لوحة التحكم</a>
-                <a href="{% url 'core:orders' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'orders' %}active{% endif %}"><i class="fas fa-receipt fa-fw me-3"></i>إدارة الطلبات</a>
-                <a href="{% url 'core:products' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'products' %}active{% endif %}"><i class="fas fa-hamburger fa-fw me-3"></i>إدارة المنتجات</a>
-                <a href="{% url 'core:stock' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'stock' %}active{% endif %}"><i class="fas fa-boxes-stacked fa-fw me-3"></i>إدارة المخزون</a>
-                <a href="{% url 'core:customers' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'customers' %}active{% endif %}"><i class="fas fa-users fa-fw me-3"></i>إدارة العملاء</a>
-                <a href="{% url 'core:wallet_recharge' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'wallet_recharge' %}active{% endif %}"><i class="fas fa-wallet fa-fw me-3"></i>شحن المحفظة</a>
+                <a href="{% url 'core:orders' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'orders' %}active{% endif %}"><i class="fas fa-receipt fa-fw me-3"></i>طلبات العملاء</a>
+                <a href="{% url 'core:products' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'products' %}active{% endif %}"><i class="fas fa-hamburger fa-fw me-3"></i>منتجات المطعم</a>
+                <a href="{% url 'core:stock' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'stock' %}active{% endif %}"><i class="fas fa-boxes-stacked fa-fw me-3"></i>المخزون</a>
+                <a href="{% url 'core:customers' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'customers' %}active{% endif %}"><i class="fas fa-users fa-fw me-3"></i>العملاء</a>
+                <a href="{% url 'core:wallet_recharge' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'wallet_recharge' %}active{% endif %}"><i class="fas fa-wallet fa-fw me-3"></i>محافظ الدفع</a>
                 <a href="{% url 'core:reports' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reports' %}active{% endif %}"><i class="fas fa-chart-pie fa-fw me-3"></i>التقارير</a>
                 <a href="{% url 'core:settings' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'settings' %}active{% endif %}"><i class="fas fa-cog fa-fw me-3"></i>الإعدادات</a>
             </div>
@@ -46,10 +49,10 @@
                         <ul class="navbar-nav ms-auto mt-2 mt-lg-0 align-items-center">
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                                    <i class="fas fa-user-circle fa-lg me-1"></i> {{ request.user.username }}
+                                    <i class="fas fa-user-circle fa-lg me-1"></i> {{ cafe_name|default:request.user.my_cafe.name|default:user.full_name }}
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                    <li><a class="dropdown-item text-danger" href="{% url 'core:logout' %}"><i class="fas fa-sign-out-alt me-2"></i>تسجيل الخروج</a></li>
+                                    <li><a class="dropdown-item text-danger" href="{% url 'core:logout' %}"><i class="fas fa-sign-out-alt me-2"></i>تسجيل خروج</a></li>
                                 </ul>
                             </li>
                         </ul>

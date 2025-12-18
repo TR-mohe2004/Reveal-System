@@ -1,32 +1,47 @@
-class College {
+class CollegeModel {
   final String id;
   final String name;
-  final String? image; // Make image nullable
+  final String? image; // يقبل null في حال عدم وجود شعار
 
-  College({required this.id, required this.name, this.image});
+  CollegeModel({
+    required this.id, 
+    required this.name, 
+    this.image
+  });
 
-  factory College.fromJson(Map<String, dynamic> json) {
-    return College(
-      id: json['id'].toString(), // Ensure id is a string
-      name: json['name'],
-      image: json['image'],
+  factory CollegeModel.fromJson(Map<String, dynamic> json) {
+    return CollegeModel(
+      // تحويل آمن للـ ID ليكون نصاً دائماً
+      id: json['id']?.toString() ?? '0',
+      
+      // حماية الاسم من أن يكون null، والبحث عن مفاتيح بديلة
+      name: json['name'] ?? json['college_name'] ?? 'كلية غير معروفة',
+      
+      // البحث عن الصورة بعدة مسميات محتملة
+      image: json['image'] ?? json['logo'] ?? json['icon_url'],
     );
   }
 
-  factory College.fromFirestore(String id, Map<String, dynamic> data) {
-    return College(
+  factory CollegeModel.fromFirestore(String id, Map<String, dynamic> data) {
+    return CollegeModel(
       id: id,
-      name: data['name'] ?? '',
-      image: data['image'],
+      name: data['name'] ?? data['college_name'] ?? '',
+      image: data['image'] ?? data['logo'],
     );
   }
 
-  // For comparison in DropdownButton
+  // --- دوال المقارنة (مهمة جداً للقوائم المنسدلة Dropdown) ---
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is College && runtimeType == other.runtimeType && id == other.id;
+      other is CollegeModel &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
   @override
   int get hashCode => id.hashCode;
+  
+  // دالة مفيدة للطباعة والتجربة
+  @override
+  String toString() => name;
 }

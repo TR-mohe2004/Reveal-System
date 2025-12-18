@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:reveal_app/app/data/models/product_model.dart';
 import 'package:reveal_app/app/data/providers/cart_provider.dart';
+import 'package:reveal_app/app/data/models/product_model.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -162,7 +162,16 @@ class _CartScreenState extends State<CartScreen> {
                                     ),
                                     InkWell(
                                       onTap: () {
-                                        final product = Product.fromCartItem(item);
+                                        final product = ProductModel(
+                                          id: item.id,
+                                          name: item.name,
+                                          price: item.price,
+                                          imageUrl: item.imageUrl,
+                                          description: '',
+                                          category: '',
+                                          collegeId: item.collegeId,
+                                          collegeName: item.collegeName,
+                                        );
                                         cart.addItem(product);
                                       },
                                       child: const Padding(

@@ -1,6 +1,7 @@
-import 'package:reveal_app/app/data/models/cart_item_model.dart';
+// تأكد أن مسار CartItemModel صحيح لديك، وإذا لم يكن موجوداً احذفه مؤقتاً
+// import 'package:reveal_app/app/data/models/cart_item_model.dart'; 
 
-class Product {
+class ProductModel {
   final String id;
   final String name;
   final double price;
@@ -18,11 +19,12 @@ class Product {
   final String collegeName;
   
   final bool isAvailable;
-
-  // --- 🔥 حقل جديد للمفضلة (قابل للتغيير) ---
+  
+  // المفضلة والتقييم
   bool isFavorite; 
+  final double rating; 
 
-  Product({
+  ProductModel({
     required this.id,
     required this.name,
     required this.price,
@@ -35,50 +37,37 @@ class Product {
     this.cafeId = '',
     this.cafeName = '',
     this.isAvailable = true,
-    this.isFavorite = false, // القيمة الافتراضية
+    this.isFavorite = false,
+    this.rating = 0.0,
   });
 
-  factory Product.fromJson(Map<String, dynamic> json) {
+  factory ProductModel.fromJson(Map<String, dynamic> json) {
+    // التعامل المرن مع الصور والأسماء المتغيرة من الباك إند
     final image = (json['image_url'] ?? json['image'] ?? json['imageUrl'] ?? '').toString();
     final collegeIdentifier = json['college']?.toString() ?? json['cafe']?.toString() ?? '';
     final cafeNameValue = (json['cafe_name'] ?? json['college_name'] ?? '').toString();
 
-    return Product(
+    return ProductModel(
       id: json['id'].toString(),
       name: (json['name'] ?? '').toString(),
       price: double.tryParse(json['price'].toString()) ?? 0.0,
       imageUrl: image,
       description: (json['description'] ?? '').toString(),
+      
       category: (json['category_name'] ?? json['category'] ?? '').toString(),
-      categoryId: json['category']?.toString() ?? '',
-      cafeId: json['cafe']?.toString() ?? '',
+      categoryId: json['category_id']?.toString() ?? '',
+      
+      cafeId: json['cafe_id']?.toString() ?? '',
       cafeName: cafeNameValue,
       collegeId: collegeIdentifier,
       collegeName: (json['college_name'] ?? json['cafe_name'] ?? '').toString(),
       
-      // استقبال حالة التوفر
       isAvailable: json['is_available'] == null
           ? true
           : json['is_available'] == true || json['is_available'].toString().toLowerCase() == 'true',
       
-      // استقبال حالة المفضلة من السيرفر (إن وجدت)
       isFavorite: json['is_favorite'] == true || json['is_favorite'].toString().toLowerCase() == 'true',
-    );
-  }
-
-  factory Product.fromCartItem(CartItem cartItem) {
-    return Product(
-      id: cartItem.id,
-      name: cartItem.name,
-      price: cartItem.price,
-      imageUrl: cartItem.imageUrl,
-      collegeId: cartItem.collegeId,
-      collegeName: cartItem.collegeName,
-      category: '',
-      description: '',
-      cafeId: cartItem.collegeId,
-      cafeName: cartItem.collegeName,
-      isFavorite: false, // قيمة افتراضية عند التحويل من السلة
+      rating: double.tryParse(json['rating'].toString()) ?? 0.0,
     );
   }
 }

@@ -1,4 +1,4 @@
-class Order {
+class OrderModel {
   final int id;
   final String orderNumber;
   final double totalPrice;
@@ -6,50 +6,53 @@ class Order {
   final String createdAt;
   final List<OrderItem> items;
 
-  // --- الحقول الجديدة التي أضفناها لتصحيح الأخطاء ---
-  final String? cafeName; // اسم الكافيتيريا
-  final String? cafeLogo; // شعار الكافيتيريا
+  // الحقول الإضافية للعرض
+  final String? cafeName;
+  final String? cafeLogo;
 
-  Order({
+  OrderModel({
     required this.id,
     required this.orderNumber,
     required this.totalPrice,
     required this.status,
     required this.createdAt,
     required this.items,
-    this.cafeName, // اختياري
-    this.cafeLogo, // اختياري
+    this.cafeName,
+    this.cafeLogo,
   });
 
-  factory Order.fromJson(Map<String, dynamic> json) {
-    return Order(
-      id: json['id'],
-      orderNumber: json['order_number'] ?? '---',
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+    return OrderModel(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      orderNumber: json['order_number']?.toString() ?? '---',
       totalPrice: double.tryParse(json['total_price'].toString()) ?? 0.0,
       status: json['status'] ?? 'PENDING',
-      createdAt: json['created_at'] ?? '',
+      createdAt: json['created_at'] ?? DateTime.now().toString(),
       items: (json['items'] as List?)?.map((i) => OrderItem.fromJson(i)).toList() ?? [],
       
-      // استقبال البيانات الجديدة من الباك اند (أو وضع قيم افتراضية)
-      cafeName: json['cafe_name'] ?? 'اسم الكافيتيريا', 
-      cafeLogo: json['cafe_logo'], 
+      // استقبال البيانات
+      cafeName: json['cafe_name'] ?? json['college_name'] ?? 'الكافيتيريا',
+      cafeLogo: json['cafe_logo'] ?? json['image_url'],
     );
   }
 
+  // تحويل التاريخ من نص إلى كائن DateTime لسهولة التنسيق
+  DateTime get dateObject {
+    try {
+      return DateTime.parse(createdAt);
+    } catch (e) {
+      return DateTime.now();
+    }
+  }
+
   String get statusText {
-    switch (status) {
-      case 'PENDING':
-        return 'قيد الانتظار';
-      case 'PREPARING':
-        return 'جاري التحضير';
-      case 'READY':
-        return 'جاهز للاستلام';
-      case 'COMPLETED':
-        return 'مكتمل';
-      case 'CANCELLED':
-        return 'ملغي';
-      default:
-        return status;
+    switch (status.toUpperCase()) {
+      case 'PENDING': return 'قيد الانتظار';
+      case 'PREPARING': return 'جاري التحضير';
+      case 'READY': return 'جاهز للاستلام';
+      case 'COMPLETED': return 'مكتمل';
+      case 'CANCELLED': return 'ملغي';
+      default: return status;
     }
   }
 }
@@ -58,24 +61,24 @@ class OrderItem {
   final int productId;
   final String productName;
   final int quantity;
-  
-  // --- حقل صورة المنتج الجديد ---
-  final String? productImage; 
+  final double price; // مفيدة لو احتجت تعرض سعر القطعة
+  final String? productImage;
 
   OrderItem({
     required this.productId,
     required this.productName,
     required this.quantity,
-    this.productImage, // اختياري
+    this.price = 0.0,
+    this.productImage,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     return OrderItem(
-      productId: json['product_id'],
+      productId: json['product_id'] ?? 0,
       productName: json['product_name'] ?? 'منتج',
       quantity: json['quantity'] ?? 1,
-      // استقبال صورة المنتج
-      productImage: json['product_image'], 
+      price: double.tryParse(json['price'].toString()) ?? 0.0,
+      productImage: json['product_image'] ?? json['image_url'],
     );
   }
 }

@@ -1,20 +1,16 @@
 from pathlib import Path
 import os
+from decouple import config
 import firebase_admin
-from firebase_admin import credentials
+from firebase_admin import credentials, firestore
 
 # --- تحديد المسار الأساسي للمشروع ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- إعدادات الأمان ---
-# ملاحظة: في الإنتاج الحقيقي يجب تغيير هذا المفتاح وجعل DEBUG = False
-SECRET_KEY = 'django-insecure-your-secret-key-change-me'
-
-# ✅ مهم جداً: يجب أن يكون True لكي نرى الأخطاء أثناء التطوير
-DEBUG = True
-
-# ✅ السماح بالاتصال من أي مكان (ضروري لتطبيق الموبايل في البداية)
-ALLOWED_HOSTS = ['*']
+SECRET_KEY = config('DJANGO_SECRET_KEY', default='unsafe-dev-secret')
+DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
+ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='*').split(',')
 
 # --- التطبيقات المثبتة ---
 INSTALLED_APPS = [
@@ -126,23 +122,34 @@ REST_FRAMEWORK = {
     ],
 }
 
-# --- إعدادات Firebase ---
-# المسار: reveal_dashboard/config/serviceAccountKey.json
-FIREBASE_CREDS_PATH = BASE_DIR / 'config' / 'serviceAccountKey.json'
+# --- التخزين المؤقت (Redis) ---
+REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "reveal"
+    }
+}
 
-# تهيئة Firebase Admin SDK
+# --- إعدادات Firebase ---
+FIREBASE_CREDS_PATH = config('FIREBASE_CREDENTIALS_PATH', default=str(BASE_DIR / 'config' / 'serviceAccountKey.json'))
+
 if not firebase_admin._apps:
     try:
         if os.path.exists(FIREBASE_CREDS_PATH):
             cred = credentials.Certificate(str(FIREBASE_CREDS_PATH))
-            firebase_admin.initialize_app(cred, {
-                'storageBucket': 'revealapp-8af3f.appspot.com'
-            })
+            firebase_admin.initialize_app(cred)
             print("✅ [OK] Firebase Admin SDK Initialized successfully!")
         else:
             print(f"⚠️ Warning: File not found at {FIREBASE_CREDS_PATH}")
     except Exception as e:
         print(f"❌ [Error] initializing Firebase: {e}")
+
+FIRESTORE_DB = firestore.client() if firebase_admin._apps else None
 
 # إعدادات Pyrebase (للاستخدام داخل التطبيق إذا لزم الأمر)
 PYREBASE_CONFIG = {

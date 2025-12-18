@@ -1,50 +1,74 @@
-// lib/app/data/models/wallet_model.dart
+class WalletModel {
+  final int id;
+  final double balance;
+  final String currency;
+  final String college;
+  final String linkCode;
+  final String lastUpdate;
+  final String fullName; // اسم الطالب للعرض
+  
+  // قائمة العمليات لعرضها أسفل الكرت
+  final List<WalletTransaction> transactions;
 
-class Wallet {
-  final int id;             // معرف المحفظة
-  final double balance;     // الرصيد الحالي
-  final String currency;    // العملة
-  final String college;     // اسم الكلية (الجديد)
-  final String linkCode;    // كود الربط (الجديد)
-  final String lastUpdate;  // تاريخ آخر تحديث
-
-  Wallet({
+  WalletModel({
     required this.id,
     required this.balance,
     required this.currency,
     required this.college,
     required this.linkCode,
     required this.lastUpdate,
+    this.fullName = "الطالب",
+    this.transactions = const [],
   });
 
-  /// دالة تحويل JSON القادم من الباك اند إلى كائن Wallet
-  factory Wallet.fromJson(Map<String, dynamic> json) {
-    return Wallet(
-      // استخدام (?? 0) لتجنب الخطأ لو كانت القيمة null
+  factory WalletModel.fromJson(Map<String, dynamic> json) {
+    var txnList = json['transactions'] as List? ?? [];
+    List<WalletTransaction> parsedTransactions = txnList.map((i) => WalletTransaction.fromJson(i)).toList();
+
+    return WalletModel(
       id: json['id'] ?? 0,
-      
-      // تحويل آمن للرقم سواء جاء نصاً أو رقماً
       balance: double.tryParse(json['balance'].toString()) ?? 0.00,
-      
       currency: json['currency'] ?? 'د.ل',
-      
-      // الحقول الجديدة التي أضفناها في المنظومة
       college: json['college']?.toString() ?? 'غير محدد',
       linkCode: json['link_code']?.toString() ?? '---',
-      
-      // تاريخ التحديث (اختياري)
       lastUpdate: json['updated_at']?.toString() ?? '',
+      fullName: json['full_name'] ?? "الطالب",
+      transactions: parsedTransactions,
     );
   }
+}
 
-  /// دالة لتحويل الكائن إلى JSON (للاستخدام المستقبلي إذا احتجنا إرساله)
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'balance': balance,
-      'currency': currency,
-      'college': college,
-      'link_code': linkCode,
-    };
+// كلاس العمليات المالية (مطلوب للجدول السفلي)
+class WalletTransaction {
+  final String id;
+  final double amount;
+  final String type; // purchase, topup
+  final String description; // اسم الكافيتيريا أو التفاصيل
+  final String date;
+  final String collegeName;
+
+  WalletTransaction({
+    required this.id,
+    required this.amount,
+    required this.type,
+    required this.description,
+    required this.date,
+    this.collegeName = '',
+  });
+
+  factory WalletTransaction.fromJson(Map<String, dynamic> json) {
+    return WalletTransaction(
+      id: json['id'].toString(),
+      amount: double.tryParse(json['amount'].toString()) ?? 0.0,
+      type: json['type'] ?? json['transaction_type'] ?? 'purchase',
+      description: json['description'] ?? json['college_name'] ?? 'عملية مالية',
+      collegeName: json['college_name'] ?? json['description'] ?? '',
+      date: json['created_at'] ?? json['timestamp'] ?? DateTime.now().toString(),
+    );
+  }
+  
+  // مساعد لتحويل التاريخ
+  DateTime get dateObj {
+     try { return DateTime.parse(date); } catch(_) { return DateTime.now(); }
   }
 }

@@ -1,8 +1,8 @@
 class User {
   final int id;
   final String fullName;
-  final String email; // ✨ تم تغييرها من String? إلى String ✨
-  final String phoneNumber; // ✨ تم تغييرها من String? إلى String ✨
+  final String email;       // ✨ نص إجباري كما طلبت ✨
+  final String phoneNumber; // ✨ نص إجباري كما طلبت ✨
   final String? profileImage;
 
   User({
@@ -13,14 +13,28 @@ class User {
     this.profileImage,
   });
 
-  // تحويل البيانات القادمة من الباك اند (JSON) إلى كائن مستخدم
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] ?? 0,
-      fullName: json['full_name'] ?? 'مستخدم', // الاسم من دجانغو
-      email: json['email'] ?? '', // ✨ قيمة افتراضية فارغة ✨
-      phoneNumber: json['phone_number'] ?? '', // ✨ قيمة افتراضية فارغة ✨
-      profileImage: json['profile_image_url'],
+      // التعامل مع الـ ID سواء جاء كنص أو رقم
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      
+      fullName: json['full_name'] ?? json['name'] ?? 'مستخدم',
+      
+      // قيم افتراضية فارغة كما طلبت لتجنب الـ Null
+      email: json['email'] ?? '', 
+      phoneNumber: json['phone_number'] ?? json['phone'] ?? '',
+      
+      profileImage: json['profile_image_url'] ?? json['image'],
     );
+  }
+
+  // دالة مفيدة لتحديث البيانات
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'full_name': fullName,
+      'email': email,
+      'phone_number': phoneNumber,
+    };
   }
 }

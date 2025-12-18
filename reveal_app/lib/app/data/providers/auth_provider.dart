@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-// ✅ تم تعديل المسارات لتكون دقيقة (Absolute Imports)
+// ✅ المسارات الصحيحة
 import 'package:reveal_app/app/data/models/user_model.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
 
@@ -40,13 +40,16 @@ class AuthProvider with ChangeNotifier {
     _status = AuthStatus.authenticating;
     notifyListeners();
     try {
-      final userData = await _apiService.getUserProfile();
-      _currentUser = User.fromJson(userData);
+      // ✅ تصحيح هام: ApiService الآن ترجع كائن User جاهزاً
+      // لا نحتاج لاستدعاء User.fromJson هنا
+      _currentUser = await _apiService.getUserProfile();
+      
       _status = AuthStatus.authenticated;
       notifyListeners();
     } catch (e) {
+      // إذا فشل جلب البروفايل (مثلاً التوكن منتهي)، نسجل الخروج
       await logout();
-      _errorMessage = 'انتهت صلاحية الجلسة';
+      _errorMessage = 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجدداً';
       notifyListeners();
     }
   }
@@ -58,19 +61,18 @@ class AuthProvider with ChangeNotifier {
 
     try {
       await _apiService.login(email, password);
+      // بعد تسجيل الدخول بنجاح، نجلب بيانات المستخدم
       await fetchUserProfile();
-      _status = AuthStatus.authenticated;
-      notifyListeners();
       return true;
     } catch (e) {
       _status = AuthStatus.unauthenticated;
+      // تنظيف رسالة الخطأ لتظهر بشكل جميل للمستخدم
       _errorMessage = e.toString().replaceAll('Exception:', '').trim();
       notifyListeners();
       return false;
     }
   }
 
-  // ✅ الدالة الآن تستقبل الإيميل وتمرره بشكل صحيح (4 متغيرات)
   Future<bool> signup(String fullName, String email, String phone, String password) async {
     _status = AuthStatus.authenticating;
     _errorMessage = null;
@@ -78,9 +80,8 @@ class AuthProvider with ChangeNotifier {
 
     try {
       await _apiService.signup(fullName, email, phone, password);
+      // بعد التسجيل بنجاح، نجلب بيانات المستخدم
       await fetchUserProfile();
-      _status = AuthStatus.authenticated;
-      notifyListeners();
       return true;
     } catch (e) {
       _status = AuthStatus.unauthenticated;

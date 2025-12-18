@@ -7,7 +7,7 @@ import 'package:reveal_app/app/data/providers/cart_provider.dart';
 import 'package:reveal_app/app/data/providers/product_provider.dart';
 
 class ProductCard extends StatelessWidget {
-  final Product product;
+  final ProductModel product;
   const ProductCard({super.key, required this.product});
 
   static final Random _random = Random();
