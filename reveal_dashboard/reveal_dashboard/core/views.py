@@ -20,15 +20,21 @@ from .forms import ProductForm
 from .serializers import ProductSerializer, OrderSerializer, UserSerializer, WalletSerializer, CafeSerializer
 from .utils import normalize_libyan_phone, send_real_notification, get_smart_image_for_product
 
-
 DEFAULT_CATEGORY_NAMES = ['Food', 'Drinks', 'Snacks']
 
+# --- Helper Function ---
+def get_cafe_for_user(user):
+    """
+    دالة مساعدة لجلب المقهى الحالي.
+    1. تحاول جلب المقهى المرتبط بالمستخدم.
+    2. إذا لم يوجد وكان المستخدم أدمن (Superuser)، تجلب أول مقهى في النظام.
+    """
+    cafe = getattr(user, 'my_cafe', None)
+    if not cafe and user.is_superuser:
+        cafe = Cafe.objects.first()
+    return cafe
 
 def ensure_categories_for_cafe(cafe):
-    """
-    Make sure the current cafe has categories available. If none exist yet,
-    create a baseline set so product creation works out of the box.
-    """
     categories_qs = Category.objects.filter(products__cafe=cafe).distinct()
     if not categories_qs.exists():
         for name in DEFAULT_CATEGORY_NAMES:
@@ -39,21 +45,16 @@ def ensure_categories_for_cafe(cafe):
 
 # --- API المصادقة ---
 
-
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_login(request):
-    """
-    تسجيل الدخول برقم ليبي 09XXXXXXXX أو +2189XXXXXXXX أو بالبريد.
-    يعتمد authenticate على EMAIL لأنه USERNAME_FIELD.
-    """
     raw_identifier = request.data.get('phone_number') or request.data.get('email')
     password = request.data.get('password')
     fcm_token = request.data.get('fcm_token')
 
     if not raw_identifier or not password:
-        return Response({'error': 'الهاتف/البريد وكلمة المرور مطلوبة'}, status=400)
+        return Response({'error': 'الهاتف/البريد وكلمة المرور مطلوبة'}, status=400)      
 
     phone = normalize_libyan_phone(raw_identifier)
 
@@ -90,10 +91,6 @@ def api_login(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_signup(request):
-    """
-    تسجيل جديد برقم ليبي 09XXXXXXXX أو +2189XXXXXXXX.
-    ينشئ بريد افتراضي فريد إذا لم يُرسل بريد، لأن EMAIL هو USERNAME_FIELD.
-    """
     raw_phone = request.data.get('phone_number')
     password = request.data.get('password')
     full_name = request.data.get('full_name') or ''
@@ -130,7 +127,6 @@ def api_signup(request):
 
 # --- API بيانات ---
 
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_cafes_list(request):
@@ -144,7 +140,12 @@ def get_cafes_list(request):
 def get_products(request):
     cafe_id = request.GET.get('cafe_id')
     if not cafe_id:
-        return Response({'error': 'cafe_id مطلوب'}, status=400)
+        # إذا لم يتم تحديد مقهى، نرجع منتجات أول مقهى أو الكل
+        first_cafe = Cafe.objects.first()
+        if first_cafe:
+            cafe_id = first_cafe.id
+        else:
+            return Response([])
 
     products = Product.objects.select_related('cafe', 'category').filter(cafe_id=cafe_id).order_by('-created_at')
 
@@ -231,7 +232,7 @@ def create_order(request):
             )
 
         send_real_notification(user, "تم استلام طلبك", f"طلبك #{new_order.order_number} قيد المعالجة.")
-        return Response({'message': 'تم إنشاء الطلب بنجاح', 'order_id': new_order.id}, status=201)
+        return Response({'message': 'تم إنشاء الطلب بنجاح', 'order_id': new_order.id}, status=201)  
 
     except Wallet.DoesNotExist:
         return Response({'error': 'المحفظة غير موجودة'}, status=404)
@@ -253,16 +254,12 @@ def get_user_orders(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def orders_endpoint(request):
-    """
-    Combined endpoint to list user orders (GET) or create a new order (POST).
-    """
     if request.method == 'GET':
         return get_user_orders(request)
     return create_order(request)
 
 
-# --- صفحات لوحة التحكم (معزولة لكل مقهى) ---
-
+# --- صفحات لوحة التحكم ---
 
 def custom_login(request):
     if request.user.is_authenticated:
@@ -297,31 +294,40 @@ def custom_logout(request):
 
 @login_required(login_url='core:login')
 def dashboard(request):
-    cafe = getattr(request.user, 'my_cafe', None)
-    products_qs = Product.objects.none()
-    orders_qs = Order.objects.none()
-    wallets_qs = Wallet.objects.none()
-
+    cafe = get_cafe_for_user(request.user)
+    
+    products_count = 0
+    orders_count = 0
+    
     if cafe:
-        products_qs = Product.objects.filter(cafe=cafe)
-        orders_qs = Order.objects.filter(cafe=cafe)
-        wallets_qs = Wallet.objects.filter(user=cafe.owner)
+        products_count = Product.objects.filter(cafe=cafe).count()
+        orders_count = Order.objects.filter(cafe=cafe).count()
+        wallets_count = Wallet.objects.count() # الأدمن يرى كل المحافظ
+    else:
+        # حالة عدم وجود مقهى، نعرض أصفار أو إحصائيات عامة
+        wallets_count = Wallet.objects.count()
 
     context = {
-        'total_products': products_qs.count(),
-        'total_cafes': 1 if cafe else 0,
-        'total_wallets': wallets_qs.count(),
+        'total_products': products_count,
+        'total_cafes': Cafe.objects.count() if request.user.is_superuser else (1 if cafe else 0),
+        'total_wallets': wallets_count,
         'user': request.user,
-        'cafe_name': cafe.name if cafe else None,
+        'cafe_name': cafe.name if cafe else "لوحة الإدارة العامة",
     }
     return render(request, 'core/dashboard.html', context)
 
 
 @login_required(login_url='core:login')
 def products(request):
-    cafe = getattr(request.user, 'my_cafe', None)
+    cafe = get_cafe_for_user(request.user)
+    
+    # التعديل: إذا لم يوجد مقهى، نعرض قائمة فارغة بدلاً من الطرد
     if not cafe:
-        return redirect('core:dashboard')
+        return render(request, 'core/products.html', {
+            'products': [],
+            'categories': [],
+            'cafe_name': "لا يوجد مقهى محدد"
+        })
 
     categories = ensure_categories_for_cafe(cafe)
     products_qs = Product.objects.filter(cafe=cafe)
@@ -329,14 +335,18 @@ def products(request):
     return render(request, 'core/products.html', {
         'products': products_qs,
         'categories': categories,
-        'cafe_name': cafe.name if cafe else None,
+        'cafe_name': cafe.name,
     })
 
 
 @login_required(login_url='core:login')
 def orders(request):
-    cafe = getattr(request.user, 'my_cafe', None)
-    all_orders = Order.objects.filter(cafe=cafe).order_by('-created_at') if cafe else Order.objects.none()
+    cafe = get_cafe_for_user(request.user)
+    
+    if not cafe:
+         return render(request, 'core/orders.html', {'orders': [], 'new_orders': [], 'preparing_orders': [], 'ready_orders': []})
+
+    all_orders = Order.objects.filter(cafe=cafe).order_by('-created_at')
     context = {
         'orders': all_orders,
         'new_orders': all_orders.filter(status='PENDING'),
@@ -399,27 +409,23 @@ def wallet_history(request):
 
 # --- إجراءات ---
 
-
 @login_required(login_url='core:login')
 def add_product(request):
-    try:
-        my_cafe = request.user.my_cafe
-    except:
-        return redirect('core:dashboard')
+    my_cafe = get_cafe_for_user(request.user)
+    if not my_cafe:
+        messages.error(request, "لا يوجد مقهى لربط المنتج به. يرجى إنشاء مقهى أولاً.")
+        return redirect('core:products')
 
     # Ensure at least one category exists for this cafe
     try:
-        categories_qs = Category.objects.filter(cafe=my_cafe)
-    except Exception:
         categories_qs = Category.objects.filter(products__cafe=my_cafe).distinct()
+    except Exception:
+         categories_qs = Category.objects.none()
 
     default_category = None
     if not categories_qs.exists():
         default_category, _ = Category.objects.get_or_create(name='General')
-        try:
-            categories_qs = Category.objects.filter(cafe=my_cafe)
-        except Exception:
-            categories_qs = Category.objects.filter(name='General')
+        categories_qs = Category.objects.filter(name='General')
 
     if request.method == 'POST':
         form = ProductForm(request.POST, request.FILES)
@@ -430,7 +436,7 @@ def add_product(request):
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f"Error in {field}: {error}")
-        
+
         if form.is_valid():
             try:
                 product = form.save(commit=False)
@@ -444,11 +450,11 @@ def add_product(request):
                         default_category, _ = Category.objects.get_or_create(name='General')
                     chosen_category = default_category
                 product.category = chosen_category
-                
+
                 # Smart Image Logic
                 if not product.image:
                     product.image = get_smart_image_for_product(product.name)
-                
+
                 product.save()
                 messages.success(request, f"✅ Product {product.name} added successfully!")
                 return redirect('core:products')
@@ -461,75 +467,42 @@ def add_product(request):
 
 @login_required(login_url='core:login')
 def edit_product(request, product_id):
-    try:
-        my_cafe = request.user.my_cafe
-    except:
-        return redirect('core:dashboard')
+    my_cafe = get_cafe_for_user(request.user)
+    if not my_cafe:
+        return redirect('core:products')
 
     product = get_object_or_404(Product, id=product_id, cafe=my_cafe)
 
-    # Ensure at least one category exists for this cafe
-    try:
-        categories_qs = Category.objects.filter(cafe=my_cafe)
-    except Exception:
-        categories_qs = Category.objects.filter(products__cafe=my_cafe).distinct()
-
-    default_category = None
+    categories_qs = Category.objects.filter(products__cafe=my_cafe).distinct()
     if not categories_qs.exists():
-        default_category, _ = Category.objects.get_or_create(name='General')
-        try:
-            categories_qs = Category.objects.filter(cafe=my_cafe)
-        except Exception:
-            categories_qs = Category.objects.filter(name='General')
+         categories_qs = Category.objects.filter(name='General')
 
     if request.method == 'POST':
         data = request.POST.copy()
-
-        # Preserve existing category or fallback to default when none supplied
-        if not data.get('category'):
-            if product.category_id:
-                data['category'] = product.category_id
-            elif default_category:
-                data['category'] = default_category.id
-
-        # Preserve existing image if no new image provided
-        if not data.get('image') and not request.FILES.get('image') and product.image:
-            data['image'] = product.image
-
         form = ProductForm(data, request.FILES, instance=product)
+        
+        # السماح باختيار التصنيف
         form.fields['category'].queryset = categories_qs
-
-        if not form.is_valid():
-            print("❌ FORM ERRORS:", form.errors)
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f"Error in {field}: {error}")
 
         if form.is_valid():
             try:
                 updated_product = form.save(commit=False)
                 updated_product.cafe = my_cafe
-
-                if not updated_product.category and default_category:
-                    updated_product.category = default_category
-
                 if not updated_product.image:
-                    from .utils import get_smart_image_for_product
-                    updated_product.image = get_smart_image_for_product(updated_product.name)
-
+                     from .utils import get_smart_image_for_product
+                     updated_product.image = get_smart_image_for_product(updated_product.name)
                 updated_product.save()
-                messages.success(request, f"✅ Product {updated_product.name} updated successfully!")
+                messages.success(request, f"✅ Product updated successfully!")
                 return redirect('core:products')
             except Exception as e:
-                print(f"❌ DATABASE ERROR: {e}")
-                messages.error(request, f"Database Error: {e}")
+                messages.error(request, f"Error: {e}")
 
     return redirect('core:products')
 
 
 @login_required(login_url='core:login')
 def delete_product(request, product_id):
-    cafe = getattr(request.user, 'my_cafe', None)
+    cafe = get_cafe_for_user(request.user)
     if cafe:
         Product.objects.filter(id=product_id, cafe=cafe).delete()
     return redirect('core:products')
@@ -580,7 +553,7 @@ def charge_wallet(request):
                 source='SYSTEM',
                 description=f"شحن من اللوحة بواسطة {request.user}"
             )
-        messages.success(request, f"تم شحن محفظة {wallet.user.full_name} بمبلغ {amount} د.ل")
+        messages.success(request, f"تم شحن محفظة {wallet.user.full_name} بمبلغ {amount} د.ل")        
     except Exception as e:
         messages.error(request, f"تعذر الشحن: {e}")
 
@@ -629,7 +602,10 @@ def refund_wallet(request):
 
 @login_required(login_url='core:login')
 def accept_order(request, order_id):
-    cafe = getattr(request.user, 'my_cafe', None)
+    cafe = get_cafe_for_user(request.user)
+    if not cafe:
+        return redirect('core:orders')
+        
     order = get_object_or_404(Order, id=order_id, cafe=cafe)
     order.status = 'PREPARING'
     order.save(update_fields=['status'])
@@ -639,7 +615,10 @@ def accept_order(request, order_id):
 
 @login_required(login_url='core:login')
 def ready_order(request, order_id):
-    cafe = getattr(request.user, 'my_cafe', None)
+    cafe = get_cafe_for_user(request.user)
+    if not cafe:
+        return redirect('core:orders')
+
     order = get_object_or_404(Order, id=order_id, cafe=cafe)
     order.status = 'READY'
     order.save(update_fields=['status'])
@@ -649,8 +628,9 @@ def ready_order(request, order_id):
 
 @login_required(login_url='core:login')
 def complete_order(request, order_id):
-    cafe = getattr(request.user, 'my_cafe', None)
-    Order.objects.filter(id=order_id, cafe=cafe).update(status='COMPLETED')
+    cafe = get_cafe_for_user(request.user)
+    if cafe:
+        Order.objects.filter(id=order_id, cafe=cafe).update(status='COMPLETED')
     return redirect('core:orders')
 
 
