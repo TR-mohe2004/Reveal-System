@@ -16,6 +16,7 @@ import 'package:reveal_app/app/data/providers/college_provider.dart';
 import 'package:reveal_app/app/presentation/screens/auth/welcome_screen.dart';
 import 'package:reveal_app/app/presentation/screens/auth/login_screen.dart';
 import 'package:reveal_app/app/presentation/screens/auth/signup_screen.dart';
+import 'package:reveal_app/app/presentation/screens/auth/link_wallet_screen.dart';
 import 'package:reveal_app/app/presentation/screens/main_screen.dart';
 
 // ملف إعدادات الفايربيز
@@ -80,6 +81,7 @@ class MyApp extends StatelessWidget {
           '/welcome': (context) => const WelcomeScreen(),
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignupScreen(),
+          '/link-wallet': (context) => const LinkWalletScreen(),
           '/main': (context) => const MainScreen(),
         },
         // نقطة البداية

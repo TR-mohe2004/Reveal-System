@@ -1,310 +1,303 @@
-﻿import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart' as intl;
-
-// استدعاء المودل (تأكد من صحة المسار لديك)
-import '../../../data/models/wallet_model.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:reveal_app/app/core/enums/view_state.dart';
+import 'package:reveal_app/app/data/providers/wallet_provider.dart';
 
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({Key? key}) : super(key: key);
+  const WalletScreen({super.key});
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  bool isLoading = true;
-  WalletModel? walletData;
-  
-  // الألوان
-  final Color tealColor = const Color(0xFF009688);
-  final Color orangeColor = const Color(0xFFFF5722);
-
   @override
   void initState() {
     super.initState();
-    fetchWalletData();
+    // جلب البيانات فور فتح الشاشة
+    // نستخدم addPostFrameCallback لضمان عدم حدوث خطأ أثناء بناء الواجهة
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<WalletProvider>().fetchWalletData();
+    });
   }
 
-  Future<void> fetchWalletData() async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-      final String? token = await user.getIdToken();
-      if (token == null) return;
-
-      // استبدل <YOUR_USERNAME> باسمك الحقيقي (RevealSystem)
-      final url = Uri.parse('https://RevealSystem.pythonanywhere.com/api/wallet/');
-      
-      final response = await http.get(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (mounted) {
-          setState(() {
-            walletData = WalletModel.fromJson(data);
-            isLoading = false;
-          });
-        }
-      } else {
-        print("Error: ${response.body}");
-        if (mounted) setState(() => isLoading = false);
-      }
-    } catch (e) {
-      print("Connection Error: $e");
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white, // خلفية بيضاء كما في الصورة العلوية
-
-      // 1. الشريط العلوي
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "المحفظة",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22),
-        ),
-        // زر القائمة (Hamburger)
-        leading: Builder(builder: (context) {
-          return IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black, size: 30),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          );
-        }),
-      ),
-      
-      drawer: const Drawer(child: Center(child: Text("القائمة الجانبية"))),
-
-      // 2. جسم الصفحة
-      body: isLoading
-          ? Center(child: CircularProgressIndicator(color: tealColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // رسالة الترحيب (اسم المستخدم الحقيقي)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: RichText(
-                      text: TextSpan(
-                        style: const TextStyle(color: Colors.black, fontSize: 16, fontFamily: 'Cairo'),
-                        children: [
-                          const TextSpan(text: "أهلاً وسهلاً، "),
-                          TextSpan(
-                            text: walletData?.fullName ?? "يا بطل",
-                            style: TextStyle(color: tealColor, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 20),
-
-                  // 3. بطاقة الرصيد الكبيرة (Teal Card)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [
-                        BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "قيمة المحفظة",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-                        ),
-                        const SizedBox(height: 10),
-                        // الرقم الحقيقي
-                        Text(
-                          "${walletData?.balance.toStringAsFixed(1) ?? '0.0'} د.ل",
-                          style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: tealColor),
-                        ),
-                        const SizedBox(height: 20),
-                        // زر شحن المحفظة
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: tealColor,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              elevation: 0,
-                            ),
-                            onPressed: () {
-                              // هنا تضع منطق الانتقال لصفحة الدفع الإلكتروني
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("خدمة الشحن الإلكتروني قادمة قريباً!")),
-                              );
-                            },
-                            child: const Text(
-                              "شحن المحفظة",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  // عنوان القائمة
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "العمليات المالية",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      TextButton(
-                        onPressed: () {}, // لفتح تقرير كامل
-                        child: Text("تقرير >", style: TextStyle(color: tealColor)),
-                      )
-                    ],
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // 4. قائمة المعاملات (List View)
-                  if (walletData == null || walletData!.transactions.isEmpty)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text("لا توجد عمليات سابقة", style: TextStyle(color: Colors.grey)),
-                    ))
-                  else
-                    ListView.builder(
-                      shrinkWrap: true, // مهم جداً داخل SingleChildScrollView
-                      physics: const NeverScrollableScrollPhysics(), // لمنع السكرول الداخلي
-                      itemCount: walletData!.transactions.length,
-                      itemBuilder: (context, index) {
-                        return _buildTransactionCard(walletData!.transactions[index]);
-                      },
-                    ),
-                ],
+  // دالة لمحاكاة عملية الدفع (تخصم محلياً فقط للتجربة)
+  void _handleTransferToCafe(BuildContext context, double currentBalance) {
+    final TextEditingController amountController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("دفع لمقهى الكلية", textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("أدخل القيمة المراد دفعها:"),
+            const SizedBox(height: 10),
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: "القيمة (د.ل)",
+                border: OutlineInputBorder(),
               ),
-            ),
-
-      // 5. الشريط السفلي (Wallet Active)
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-        ),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: tealColor,
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white70,
-          currentIndex: 4, // رقم 4 هو المحفظة حسب الترتيب في الصورة
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          items: [
-            const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "الرئيسية"),
-            const BottomNavigationBarItem(icon: Icon(Icons.shopping_cart_outlined), label: "السلة"),
-            const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: "الحساب"),
-            const BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), label: "طلباتي"),
-            // أيقونة المحفظة المميزة بالدائرة البرتقالية
-            BottomNavigationBarItem(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: orangeColor, 
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 20),
-              ),
-              label: "المحفظة",
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("إلغاء", style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (amountController.text.isNotEmpty) {
+                double amount = double.tryParse(amountController.text) ?? 0.0;
+                if (amount > 0 && amount <= currentBalance) {
+                  // تحديث الرصيد محلياً عبر البروفايدر
+                  context.read<WalletProvider>().updateLocalBalance(currentBalance - amount);
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("تم خصم $amount د.ل بنجاح")),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("رصيد غير كافٍ أو قيمة غير صحيحة"), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF009688)),
+            child: const Text("تأكيد"),
+          ),
+        ],
       ),
     );
   }
 
-  // تصميم كرت المعاملة الواحدة
-  Widget _buildTransactionCard(WalletTransaction txn) {
-    // تنسيق التاريخ الحقيقي
-    final dateStr = intl.DateFormat('yyyy/MM/dd').format(txn.dateObj);
-    
-    // تحديد الإشارة (+ أو -)
-    final isPurchase = txn.type == 'purchase';
-    final amountSign = isPurchase ? "-" : "+";
-    final amountColor = isPurchase ? Colors.red : Colors.green;
+  @override
+  Widget build(BuildContext context) {
+    // Consumer للاستماع للتغييرات في البروفايدر
+    return Consumer<WalletProvider>(
+      builder: (context, provider, child) {
+        
+        // 1. حالة التحميل (لأول مرة)
+        if (provider.state == ViewState.busy && provider.wallet == null) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFF009688)));
+        }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2))],
-      ),
-      child: Row(
-        children: [
-          // اللوجو (دائري)
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.white,
-            backgroundImage: const NetworkImage("https://cdn-icons-png.flaticon.com/512/3063/3063822.png"), // صورة افتراضية أو شعار الكلية
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: orangeColor, width: 2), // الدائرة البرتقالية حول الشعار
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          
-          // تفاصيل العملية
-          Expanded(
+        // 2. حالة الخطأ
+        if (provider.state == ViewState.error && provider.wallet == null) {
+          return Center(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  txn.collegeName.isNotEmpty ? txn.collegeName : txn.description,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
+                const SizedBox(height: 10),
+                Text(provider.errorMessage ?? "حدث خطأ غير متوقع"),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => provider.fetchWalletData(),
+                  child: const Text("إعادة المحاولة"),
+                )
+              ],
+            ),
+          );
+        }
+
+        // 3. حالة عرض البيانات (Retrieved)
+        final wallet = provider.wallet;
+        
+        // إذا لم تكن هناك محفظة (null)، نعرض واجهة فارغة أو زر لإنشاء محفظة
+        if (wallet == null) {
+           return const Center(child: Text("لا توجد بيانات محفظة متاحة"));
+        }
+
+        return RefreshIndicator(
+          onRefresh: () => provider.fetchWalletData(),
+          color: const Color(0xFF009688),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                
+                // --- بطاقة المحفظة ---
+                Container(
+                  height: 220,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF009688), Color(0xFF4DB6AC)],
+                    ),
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: -50,
+                        left: -50,
+                        child: Container(
+                          width: 150,
+                          height: 150,
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                        ),
+                      ),
+                      
+                      Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // الصف العلوي: الاسم والكلية
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        wallet.userFullName, // الاسم من السيرفر
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        wallet.college, // الكلية من السيرفر
+                                        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.nfc, color: Colors.white70, size: 30),
+                              ],
+                            ),
+
+                            // الوسط: الرصيد
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "الرصيد المتاح",
+                                  style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Text(
+                                      wallet.balance.toStringAsFixed(2), // الرصيد من السيرفر
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      wallet.currency, // العملة من السيرفر
+                                      style: const TextStyle(color: Colors.white70, fontSize: 20),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+
+                            // الأسفل: كود المحفظة
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "كود الربط (للشحن)",
+                                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                                    ),
+                                    SelectableText( // جعل النص قابل للنسخ
+                                      wallet.linkCode.isEmpty ? "---" : wallet.linkCode,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        letterSpacing: 2,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  dateStr, // التاريخ الحقيقي المنسق
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+
+                const SizedBox(height: 40),
+
+                // --- الأزرار ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.payment,
+                      label: "دفع",
+                      onTap: () => _handleTransferToCafe(context, wallet.balance),
+                    ),
+                    _buildActionButton(
+                      icon: Icons.history,
+                      label: "السجل",
+                      onTap: () {
+                         // الانتقال لصفحة السجل (لاحقاً)
+                      },
+                    ),
+                    _buildActionButton(
+                      icon: Icons.refresh, // زر تحديث يدوي إضافي
+                      label: "تحديث",
+                      onTap: () => provider.fetchWalletData(),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          
-          // المبلغ
-          Text(
-            "$amountSign${txn.amount.toStringAsFixed(0)} د.ل",
-            style: TextStyle(
-              color: amountColor, 
-              fontWeight: FontWeight.bold, 
-              fontSize: 16
+        );
+      },
+    );
+  }
+
+  Widget _buildActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, spreadRadius: 2),
+              ],
             ),
-            textDirection: TextDirection.ltr, // عشان الدينار يجي يسار أو يمين صح
+            child: Icon(icon, color: const Color(0xFF009688), size: 32),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }

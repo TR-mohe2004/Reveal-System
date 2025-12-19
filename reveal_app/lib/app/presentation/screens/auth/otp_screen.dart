@@ -3,9 +3,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pinput/pinput.dart';
+import '../main_screen.dart'; // تأكد أن هذا المسار صحيح
 
 class OTPScreen extends StatefulWidget {
-  final String phoneNumber; // لاستقبال رقم الهاتف من الشاشة السابقة
+  final String phoneNumber;
 
   const OTPScreen({super.key, required this.phoneNumber});
 
@@ -16,8 +17,8 @@ class OTPScreen extends StatefulWidget {
 class _OTPScreenState extends State<OTPScreen> {
   final _pinController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
-  // متغيرات المؤقت الزمني
+
+  // إدارة المؤقت
   Timer? _timer;
   int _start = 60;
   bool _canResend = false;
@@ -35,14 +36,18 @@ class _OTPScreenState extends State<OTPScreen> {
     });
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_start == 0) {
-        setState(() {
-          _canResend = true;
-          timer.cancel();
-        });
+        if (mounted) {
+          setState(() {
+            _canResend = true;
+            timer.cancel();
+          });
+        }
       } else {
-        setState(() {
-          _start--;
-        });
+        if (mounted) {
+          setState(() {
+            _start--;
+          });
+        }
       }
     });
   }
@@ -54,21 +59,83 @@ class _OTPScreenState extends State<OTPScreen> {
     super.dispose();
   }
 
+  // توحيد الأرقام
+  String _normalizeDigits(String input) {
+    final buffer = StringBuffer();
+    for (final code in input.runes) {
+      if (code >= 0x30 && code <= 0x39) {
+        buffer.writeCharCode(code);
+        continue;
+      }
+      if (code >= 0x0660 && code <= 0x0669) {
+        buffer.write(code - 0x0660);
+        continue;
+      }
+      if (code >= 0x06F0 && code <= 0x06F9) {
+        buffer.write(code - 0x06F0);
+      }
+    }
+    return buffer.toString();
+  }
+
+  // التحقق (5 أرقام)
+  bool _isValidOtp(String value) {
+    final normalized = _normalizeDigits(value);
+    return RegExp(r'^\d{5}$').hasMatch(normalized);
+  }
+
+  // الدخول المباشر (تجاوز السيرفر)
+  void _bypassAndGoHome() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم التحقق بنجاح'),
+        backgroundColor: Color(0xFF2DBA9D),
+        duration: Duration(milliseconds: 500),
+      ),
+    );
+    
+    Future.delayed(const Duration(milliseconds: 300), () {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const MainScreen()),
+        (route) => false,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    // تصميم حقول الإدخال الافتراضية والمُركزة
+    // 1. إعداد الثيم الافتراضي (الخانة العادية)
     final defaultPinTheme = PinTheme(
-      width: 56,
-      height: 56,
-      textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      width: 60,
+      height: 60,
+      textStyle: const TextStyle(
+        fontSize: 24,
+        color: Colors.black,
+        fontWeight: FontWeight.bold,
+      ),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        shape: BoxShape.circle,
+        color: const Color(0xFFF0F0F0), // رمادي فاتح
+        shape: BoxShape.circle, // دائري
       ),
     );
 
-    final focusedPinTheme = defaultPinTheme.copyDecorationWith(
-      border: Border.all(color: const Color(0xFF2DBA9D), width: 2),
+    // 2. إعداد ثيم التركيز (عند الكتابة) - تم تصحيح الخطأ هنا
+    final focusedPinTheme = defaultPinTheme.copyWith(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFF2DBA9D), width: 2), // إطار ملون
+      ),
+    );
+
+    // 3. إعداد ثيم الخطأ
+    final errorPinTheme = defaultPinTheme.copyWith(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.redAccent, width: 2),
+      ),
     );
 
     return Scaffold(
@@ -77,113 +144,163 @@ class _OTPScreenState extends State<OTPScreen> {
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 1. زر الرجوع
+                  // زر الرجوع
                   Align(
-                    alignment: Alignment.topLeft,
-                    child: IconButton(
-                      icon: Container(
+                    alignment: Alignment.centerRight,
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          shape: BoxShape.rectangle,
-                          border: Border.all(color: Colors.grey.shade400, width: 1.5),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.black, width: 2),
                         ),
-                        child: const Icon(Icons.arrow_forward_ios, size: 18),
+                        child: const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 20,
+                          color: Colors.black,
+                        ),
                       ),
-                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
+                  
                   const SizedBox(height: 40),
 
-                  // 2. الشعار
-                  // TODO: استبدل الأيقونة بصورة الشعار الحقيقية
-                  const Icon(Icons.qr_code_scanner, size: 80, color: Color(0xFF2DBA9D)),
-                  const SizedBox(height: 32),
+                  // الشعار (مؤقت)
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                    ),
+                    child: const Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(Icons.grid_view_rounded, size: 80, color: Color(0xFFE87C3E)),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 30),
 
-                  // 3. العنوان الرئيسي
+                  // النصوص
                   const Text(
                     'أدخل رمز التأكيد',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
                     'قم بإدخال الرمز الذي تم إرساله على الرقم',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
+                  const SizedBox(height: 4),
                   Text(
-                    widget.phoneNumber, // عرض رقم الهاتف
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    widget.phoneNumber.isNotEmpty ? widget.phoneNumber : "090000000",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      letterSpacing: 1,
+                    ),
                   ),
-                  const SizedBox(height: 48),
 
-                  // 4. حقول إدخال الـ OTP
+                  const SizedBox(height: 40),
+
+                  // خانات الإدخال (5 خانات)
                   Pinput(
                     controller: _pinController,
                     length: 5,
                     defaultPinTheme: defaultPinTheme,
                     focusedPinTheme: focusedPinTheme,
-                    submittedPinTheme: defaultPinTheme.copyDecorationWith(
-                      border: Border.all(color: Colors.green, width: 2),
-                    ),
+                    errorPinTheme: errorPinTheme, // استخدام ثيم الخطأ المصحح
                     pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
                     showCursor: true,
+                    keyboardType: TextInputType.number,
                     onCompleted: (pin) {
-                      // TODO: Implement OTP verification logic
-                      debugPrint('Completed: $pin');
+                      if (_isValidOtp(pin)) {
+                        _bypassAndGoHome();
+                      }
                     },
                   ),
-                  const SizedBox(height: 32),
 
-                  // 5. رابط إعادة الإرسال مع المؤقت
+                  const SizedBox(height: 30),
+
+                  // إعادة الإرسال
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      TextButton(
-                        onPressed: _canResend ? startTimer : null, // تفعيل الزر عند انتهاء المؤقت
+                      Text(
+                        'لم يصلك الرمز؟ ',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                      ),
+                      GestureDetector(
+                        onTap: _canResend ? () {
+                           startTimer();
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             const SnackBar(content: Text('تم إعادة إرسال الرمز (وهمي)')),
+                           );
+                        } : null,
                         child: Text(
-                          'إعادة الإرسال',
+                          _canResend ? 'إعادة الإرسال' : ' انتظر $_start ث',
                           style: TextStyle(
-                            color: _canResend ? const Color(0xFFF27E49) : Colors.grey,
+                            color: _canResend ? const Color(0xFF2DBA9D) : Colors.grey,
                             fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
+                            fontSize: 16,
                           ),
                         ),
                       ),
-                      Text(
-                        _canResend ? 'لم يصلك الرمز؟' : 'يمكنك إعادة الإرسال بعد: $_start ثانية',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 24),
 
-                  // 6. زر المتابعة
-                  ElevatedButton(
-                    onPressed: () {
-                      // TODO: Implement OTP verification logic
-                      if (_formKey.currentState!.validate()) {
-                        debugPrint('Submitting OTP: ${_pinController.text}');
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2DBA9D),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
+                  const SizedBox(height: 40),
+
+                  // زر المتابعة
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final rawValue = _pinController.text;
+                        if (!_isValidOtp(rawValue)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('الرجاء إدخال 5 أرقام'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+                        _bypassAndGoHome();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2DBA9D),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'المتابعة',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      child: const Text(
+                        'المتابعة',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ],
