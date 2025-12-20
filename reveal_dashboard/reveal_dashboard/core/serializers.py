@@ -1,12 +1,11 @@
-from rest_framework import serializers  
+from rest_framework import serializers
 from .models import Cafe, Product, Order, OrderItem, Category
-from wallet.models import Wallet, Transaction
 from users.models import User
 
-
+# --- دالة مساعدة لبناء روابط الصور ---
 def _build_image_url(image_value, request=None):
     """
-    Normalize stored image paths into absolute URLs when a request is available.
+    تقوم بتحويل مسار الصورة المخزن إلى رابط كامل (Absolute URL).
     """
     if not image_value:
         return None
@@ -16,78 +15,63 @@ def _build_image_url(image_value, request=None):
         return image_str
 
     if request:
-        if not image_str.startswith('/'):
-            image_str = f'/{image_str}'
-        return request.build_absolute_uri(image_str)
+        return request.build_absolute_uri(image_value.url if hasattr(image_value, 'url') else image_str)
 
-    return image_str
+    return f"/media/{image_str}" if not image_str.startswith('/media/') else image_str
 
 
-# --- 1. U.O¦OñOªU. OU,U.O3O¦OrO_U. (User) ---
+# --- 1. تسلسل المستخدم (User Serializer) ---
+# نبقيه هنا لأننا نحتاجه لعرض البروفايل في تطبيق Core
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email', 'full_name', 'phone_number']
 
 
-# --- 2. U.O¦OñOªU. OU,U.O-U?O,Oc (Wallet) - UØOU. OªO_OU< ---
-class WalletSerializer(serializers.ModelSerializer):
-    currency = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Wallet
-        # U+OñO3U, OU,O-U,U^U, OU,U.UØU.Oc U,U,O¦OúO"USU, O"U.O U?USUØO UŸU^O_ OU,OñO"Oú U^OU,OñOæUSO_
-        fields = ['id', 'balance', 'currency', 'link_code', 'college', 'updated_at']
-
-    def get_currency(self, obj):
-        # ?? OU,O?O1U^O_ O1U.U,USOc O"OU, OU,OªO_USO_ U?US Wallet
-        return 'LYD'
+# ❌ تم حذف WalletSerializer و TransactionSerializer من هنا
+# ✅ مكانهما الصحيح الآن هو: wallet/serializers.py
 
 
-# --- 3. U.O¦OñOªU. O3OªU, OU,O1U.U,USOO¦ (Transactions) ---
-class TransactionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Transaction
-        fields = ['id', 'amount', 'transaction_type', 'source', 'description', 'created_at']
-
-
-# --- 4. U.O¦OñOªU.OO¦ OU,U.U+O,U^U.Oc (Cafe, Category, Product) ---
+# --- 2. تسلسل البيانات الأساسية (Cafe, Category, Product) ---
 class CafeSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    
     class Meta:
         model = Cafe
-        fields = ['id', 'name', 'image']
+        fields = ['id', 'name', 'image', 'location', 'is_active']
+        
+    def get_image(self, obj):
+        request = self.context.get('request')
+        return _build_image_url(obj.image, request)
 
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name', 'image']
+        fields = ['id', 'name']
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    # O-U,U^U, OOOU?USOc U,U,U,OñOO­Oc U?U,Oú (U,U,O¦U^OUSO- U?US OU,O¦OúO"USU,)
     cafe_name = serializers.CharField(source='cafe.name', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
-    college = serializers.IntegerField(source='cafe.id', read_only=True)
-    college_name = serializers.CharField(source='cafe.name', read_only=True)
     image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'price', 'image', 'image_url', 'description',
+            'id', 'name', 'price', 'image_url', 'description',
+            'rating', 'rating_count',
             'category', 'category_name',
-            'cafe', 'cafe_name', 'college', 'college_name',
+            'cafe', 'cafe_name',
             'is_available'
         ]
 
     def get_image_url(self, obj):
-        # O¦O1O_USU, U.U+ O"U,OO" O¦OñO1OñU?Oñ OU,O'O"O1 OªO_USO_ OU,OæU^OñOc
         request = self.context.get('request')
-        return _build_image_url(getattr(obj, 'image', None), request)
+        return _build_image_url(obj.image, request)
 
 
-# --- 5. U.O¦OñOªU.OO¦ OU,OúU,O"OO¦ (Orders) ---
+# --- 3. تسلسل الطلبات (Order Serializers) ---
 class OrderItemSerializer(serializers.ModelSerializer):
     product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), source='product')
     product_name = serializers.ReadOnlyField(source='product.name')
@@ -100,29 +84,14 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     def get_product_image(self, obj):
         request = self.context.get('request')
-        return _build_image_url(getattr(obj.product, 'image', None), request)
+        return _build_image_url(obj.product.image, request)
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True)
+    items = OrderItemSerializer(many=True, read_only=True)
     cafe_name = serializers.ReadOnlyField(source='cafe.name')
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = Order
-        fields = ['id', 'order_number', 'total_price', 'status', 'created_at', 'cafe_name', 'items']
-
-    def create(self, validated_data):
-        items_data = validated_data.pop('items')
-        user = self.context['request'].user
-
-        # OOrO¦USOOñ UŸOU?USO¦USOñUSO OU?O¦OñOOUSOc OOøO U,U. O¦O-O_O_ (OœU^ USU.UŸU+ O¦U.OñUSOñUØO U.U+ OU,O¦OúO"USU,)
-        # UØU+O U+OœOrOø OœU^U, UŸOU?USO¦USOñUSO UŸOOªOñOO­ OO-O¦OñOOýUS U?U,Oú
-        from .models import Cafe
-        cafe = Cafe.objects.first()
-
-        order = Order.objects.create(user=user, cafe=cafe, **validated_data)
-
-        for item_data in items_data:
-            OrderItem.objects.create(order=order, **item_data)
-
-        return order
+        fields = ['id', 'order_number', 'total_price', 'status', 'status_display', 'created_at', 'cafe_name', 'items']

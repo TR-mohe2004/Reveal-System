@@ -1,25 +1,42 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Product, RestaurantCard # تأكد من اسم الموديل الخاص بكرت المطعم
-from .utils import get_smart_image_for_product
+from .models import Order
+from .utils import send_real_notification
 
-@receiver(post_save, sender=Product)
-def create_restaurant_card_automatically(sender, instance, created, **kwargs):
+@receiver(post_save, sender=Order)
+def order_status_notification(sender, instance, created, **kwargs):
     """
-    عندما يضيف صاحب المطعم منتجاً جديداً:
-    1. النظام ينشئ كرت مطعم تلقائياً.
-    2. النظام يفحص الاسم ويضع الصورة المناسبة إذا لم يرفعها الادمن.
+    إرسال إشعار تلقائي للمستخدم عند تغير حالة الطلب.
     """
     if created:
-        # تحديد الصورة الذكية إذا لم توجد صورة
-        if not instance.image:
-            instance.image = get_smart_image_for_product(instance.name)
-            instance.save()
-        
-        # إنشاء كرت المطعم للعرض في التطبيق
-        RestaurantCard.objects.create(
-            product=instance,
-            is_active=True,
-            display_price=instance.price,
-            image=instance.image
+        # إشعار عند إنشاء الطلب لأول مرة (اختياري)
+        return
+
+    # إرسال إشعار حسب الحالة الجديدة
+    if instance.status == 'PREPARING':
+        send_real_notification(
+            instance.user, 
+            "جاري التحضير 👨‍🍳", 
+            f"بدأنا في تحضير طلبك #{instance.order_number}. يرجى الانتظار."
+        )
+    
+    elif instance.status == 'READY':
+        send_real_notification(
+            instance.user, 
+            "طلبك جاهز! 🍕", 
+            f"الطلب #{instance.order_number} جاهز للاستلام. صحتين!"
+        )
+
+    elif instance.status == 'COMPLETED':
+        send_real_notification(
+            instance.user, 
+            "تم الاستلام ✅", 
+            f"تم تسليم الطلب #{instance.order_number}. شكراً لاستخدامك تطبيقنا."
+        )
+
+    elif instance.status == 'CANCELLED':
+        send_real_notification(
+            instance.user, 
+            "تم إلغاء الطلب ❌", 
+            f"عذراً، تم إلغاء الطلب #{instance.order_number}. يرجى مراجعة الإدارة."
         )

@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import os
 from decouple import config
 import firebase_admin
@@ -8,13 +8,8 @@ from firebase_admin import credentials, firestore
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- إعدادات الأمان ---
-# يفضل استخدام متغيرات البيئة، ولكن وضعنا قيم افتراضية لضمان عدم توقف الموقع
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-change-me-please')
-
-# اجعلها True أثناء التطوير، و False عند النشر النهائي
 DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
-
-# السماح لجميع النطاقات مؤقتاً (بما في ذلك PythonAnywhere)
 ALLOWED_HOSTS = ['*'] 
 
 # --- التطبيقات المثبتة ---
@@ -28,20 +23,18 @@ INSTALLED_APPS = [
 
     # --- مكتبات الطرف الثالث ---
     'rest_framework',
-    'rest_framework.authtoken', # لإنشاء التوكن للموبايل
-    'corsheaders', # للسماح للموبايل بالاتصال
+    'rest_framework.authtoken',
+    'corsheaders',
 
     # --- تطبيقاتنا الخاصة ---
     'core.apps.CoreConfig',
     'users.apps.UsersConfig',
-    'wallet.apps.WalletConfig',
-    # تأكد أن لديك تطبيق products إذا كنت تستخدمه، أضفه هنا:
-    # 'products.apps.ProductsConfig', 
+    'wallet.apps.WalletConfig', 
 ]
 
 # --- الوسائط (Middleware) ---
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # ✅ مكانه صحيح (الأول)
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -102,14 +95,13 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles" 
 
-# إعدادات الصور والملفات المرفوعة
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- إعدادات CORS (للموبايل) ---
-CORS_ALLOW_ALL_ORIGINS = True # السماح للجميع (مهم للـ Flutter)
+# --- إعدادات CORS ---
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # --- إعدادات REST Framework ---
@@ -119,13 +111,11 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny', # يسمح بالوصول العام، يمكنك تغييره لاحقاً
+        'rest_framework.permissions.AllowAny',
     ],
 }
 
-# --- التخزين المؤقت (تعديل هام جداً للسيرفر) ---
-# ❌ تم إيقاف Redis لأنه يسبب مشاكل في PythonAnywhere
-# ✅ تم استبداله بـ Local Memory Cache (الأفضل والاسرع حالياً)
+# --- التخزين المؤقت ---
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -134,27 +124,23 @@ CACHES = {
 }
 
 # --- إعدادات Firebase ---
-#  محاولة قراءة المسار من المتغيرات، أو استخدام المسار الافتراضي
 FIREBASE_CREDS_PATH = config('FIREBASE_CREDENTIALS_PATH', default=str(BASE_DIR / 'config' / 'serviceAccountKey.json'))
 
-# تهيئة الفايربيز مع حماية من الأخطاء
 if not firebase_admin._apps:
     try:
         if os.path.exists(FIREBASE_CREDS_PATH):
             cred = credentials.Certificate(FIREBASE_CREDS_PATH)
             firebase_admin.initialize_app(cred)
-            print("✅ [OK] Firebase Admin SDK Initialized successfully!")
+            print(" [OK] Firebase Admin SDK Initialized successfully!")
         else:
-            # رسالة تحذير فقط لكي لا يتوقف السيرفر بالكامل
-            print(f"⚠️ [Warning] Firebase JSON file not found at: {FIREBASE_CREDS_PATH}")
+            print(f" [Warning] Firebase JSON file not found at: {FIREBASE_CREDS_PATH}")
             print("   Make sure the file exists inside the 'config' folder.")
     except Exception as e:
-        print(f"❌ [Error] Failed to initialize Firebase: {e}")
+        print(f" [Error] Failed to initialize Firebase: {e}")
 
-# تعريف العميل (سيكون None إذا فشل الاتصال، وهذا يمنع انهيار الموقع)
 FIRESTORE_DB = firestore.client() if firebase_admin._apps else None
 
-# إعدادات Pyrebase (للواجهة الأمامية أو استخدامات خاصة)
+# إعدادات Pyrebase
 PYREBASE_CONFIG = {
     "apiKey": "AIzaSyCSCPWbtxmXJzTwGwj4OZDba3r3JaCuAlU",
     "authDomain": "revealapp-8af3f.firebaseapp.com",

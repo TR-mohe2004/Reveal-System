@@ -7,13 +7,16 @@ urlpatterns = [
     # رابط لوحة تحكم الأدمن الخاصة بـ Django
     path('admin/', admin.site.urls),
     
-    # ✅ التعديل الحاسم:
-    # نوجه كل الطلبات (سواء كانت للداشبورد أو للـ API) إلى ملف core.urls
-    # لأننا قمنا بتعريف مسارات مثل 'api/login' و 'dashboard/' داخله
+    # ✅ 1. توجيه روابط التطبيق (API)
+    # أي رابط يبدأ بكلمة api/ سيذهب فوراً إلى ملف core/api_urls.py
+    path('api/', include('core.api_urls')),
+
+    # ✅ 2. توجيه روابط الموقع (الداش بورد)
+    # أي رابط آخر (مثل dashboard/, login/) سيذهب إلى ملف core/urls.py
     path('', include('core.urls')),
 ]
 
 # إعدادات ملفات الميديا (الصور)
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)    
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

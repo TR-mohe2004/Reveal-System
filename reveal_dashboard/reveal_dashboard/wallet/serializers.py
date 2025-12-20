@@ -1,25 +1,26 @@
 from rest_framework import serializers
 from .models import Wallet, Transaction
 
-
 class TransactionSerializer(serializers.ModelSerializer):
+    # إضافة اسم الكلية لتظهر في سجل المعاملات في التطبيق
     college_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Transaction
-        fields = ['id', 'wallet', 'amount', 'transaction_type', 'source', 'description', 'created_at', 'college_name']
+        fields = ['id', 'amount', 'transaction_type', 'source', 'description', 'created_at', 'college_name']
 
     def get_college_name(self, obj):
         return getattr(obj.wallet, 'college', None)
 
 
 class WalletSerializer(serializers.ModelSerializer):
-    transactions = serializers.SerializerMethodField()
+    # عرض المعاملات كجزء من المحفظة (اختياري، لكن مفيد للتطبيق)
+    transactions = TransactionSerializer(many=True, read_only=True)
+    currency = serializers.SerializerMethodField()
 
     class Meta:
         model = Wallet
-        fields = ['id', 'user', 'balance', 'link_code', 'college', 'updated_at', 'transactions']
+        fields = ['id', 'balance', 'currency', 'link_code', 'college', 'updated_at', 'transactions']
 
-    def get_transactions(self, obj):
-        txns = getattr(obj, 'prefetched_transactions', None) or obj.transactions.order_by('-created_at').select_related('wallet')
-        return TransactionSerializer(txns, many=True).data
+    def get_currency(self, obj):
+        return "LYD"

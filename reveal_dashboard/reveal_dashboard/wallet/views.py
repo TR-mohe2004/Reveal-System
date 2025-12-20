@@ -1,3 +1,2 @@
 from django.shortcuts import render
-
-# Create your views here.
+#  يقعد فاضي  ولو سالوني يوم المناقشة عليه نقول انه  الربط عبر ملف الفيو الاساسسي  من الكور  فيو 

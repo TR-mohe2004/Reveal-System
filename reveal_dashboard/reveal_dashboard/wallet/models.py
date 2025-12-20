@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 import uuid
-from django.db import transaction # مهم لضمان سلامة العمليات المالية
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -9,11 +9,11 @@ class Wallet(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wallet', verbose_name="الطالب")
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="الرصيد الحالي")
     link_code = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name="كود الربط")
+    # يمكنك جعل الكلية اختيار من قائمة إذا أردت لاحقاً
     college = models.CharField(max_length=100, default="كلية تقنية المعلومات", verbose_name="الكلية")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="آخر تحديث")
 
     def save(self, *args, **kwargs):
-        # توليد كود الربط تلقائياً إذا لم يكن موجوداً
         if not self.link_code:
             self.link_code = str(uuid.uuid4())[:8].upper()
         super().save(*args, **kwargs)
@@ -40,34 +40,31 @@ class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        # استخدام atomic لضمان: إما أن تتم العملية بالكامل (إنشاء + خصم) أو تفشل بالكامل
-        # هذا يمنع وجود عملية خصم في السجل دون أن ينقص الرصيد فعلياً
+        # Transaction Logic: Update wallet balance atomically
         with transaction.atomic():
             if not self.pk: 
+                # Lock wallet row for update to prevent race conditions
+                wallet = Wallet.objects.select_for_update().get(pk=self.wallet.pk)
+                
                 if self.transaction_type == 'DEPOSIT':
-                    self.wallet.balance += self.amount
+                    wallet.balance += self.amount
                 elif self.transaction_type == 'WITHDRAWAL':
-                    # السماح بالخصم فقط إذا كان الرصيد كافياً
-                    if self.wallet.balance >= self.amount:
-                        self.wallet.balance -= self.amount
+                    if wallet.balance >= self.amount:
+                        wallet.balance -= self.amount
                     else:
                         raise ValueError("الرصيد لا يكفي لإتمام العملية!")
                 
-                # حفظ التعديل في المحفظة
-                self.wallet.save()
+                wallet.save()
             
-            # حفظ العملية نفسها
             super().save(*args, **kwargs)
 
-# --- 🔥 الإضافة الضرورية جداً (Signals) ---
-# هذا الكود يضمن أنه بمجرد إنشاء مستخدم (User)، يتم إنشاء محفظة له فوراً
+# --- Signals لإنشاء المحفظة تلقائياً ---
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_user_wallet(sender, instance, created, **kwargs):
     if created:
-        Wallet.objects.create(user=instance)
+        Wallet.objects.get_or_create(user=instance)
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def save_user_wallet(sender, instance, **kwargs):
-    # للتأكد من حفظ المحفظة إذا تم تعديل المستخدم (احتياطي)
     if hasattr(instance, 'wallet'):
         instance.wallet.save()
