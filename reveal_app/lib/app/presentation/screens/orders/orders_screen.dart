@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:reveal_app/app/core/utils/smart_image_util.dart'; // استيراد الحيلة الذكية
 import 'package:reveal_app/app/data/models/order_model.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
 
@@ -24,13 +25,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
     fetchOrders();
   }
 
-  // دالة جلب الطلبات الحقيقية
   Future<void> fetchOrders() async {
     try {
       final apiService = ApiService();
-      // جلب الطلبات من السيرفر
       final orders = await apiService.getOrders();
-      
       if (mounted) {
         setState(() {
           myOrders = orders;
@@ -39,202 +37,167 @@ class _OrdersScreenState extends State<OrdersScreen> {
       }
     } catch (e) {
       debugPrint("Error fetching orders: $e");
-      // في حال الخطأ نوقف التحميل (يمكنك إضافة بيانات وهمية هنا للتجربة إذا أردت)
       if (mounted) setState(() => isLoading = false);
     }
   }
 
-  // تحديد ستايل الحالة (اللون والنص)
+  // تحديد ستايل الحالة وأيقونتها
   Map<String, dynamic> getStatusStyle(String status) {
     switch (status.toUpperCase()) {
       case 'SUCCESS':
       case 'COMPLETED':
-        return {"color": tealColor, "text": "مكتمل ✅", "bg": tealColor};
+      case 'READY':
+        return {"color": tealColor, "text": "جاهز للاستلام ✅", "bg": tealColor.withOpacity(0.1)};
       case 'PREPARING':
-        return {"color": Colors.orange, "text": "قيد التحضير 👨‍🍳", "bg": Colors.orange};
+        return {"color": Colors.orange, "text": "قيد التحضير 👨‍🍳", "bg": Colors.orange.withOpacity(0.1)};
       case 'CANCELLED':
-        return {"color": Colors.red, "text": "ملغي ❌", "bg": Colors.red};
+        return {"color": Colors.red, "text": "ملغي ❌", "bg": Colors.red.withOpacity(0.1)};
       case 'PENDING':
       default:
-        return {"color": Colors.grey, "text": "قيد الانتظار...", "bg": Colors.grey};
+        return {"color": Colors.grey, "text": "قيد الانتظار ⏳", "bg": Colors.grey.withOpacity(0.1)};
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5), // خلفية رمادية فاتحة
-      
-      // --- 1. الشريط العلوي (AppBar) ---
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "طلباتي",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-        leading: Builder(builder: (context) {
-          return IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black, size: 28),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          );
-        }),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: const [
-                Text("الموقع الحالي", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                Text("طرابلس الجامعية", style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          )
-        ],
-      ),
-
-      // القائمة الجانبية
-      drawer: const Drawer(child: Center(child: Text("القائمة الجانبية"))),
-
-      // --- 2. جسم الصفحة (قائمة الطلبات) ---
-      body: isLoading
-          ? Center(child: CircularProgressIndicator(color: tealColor))
-          : myOrders.isEmpty
-              ? const Center(child: Text("لا توجد طلبات سابقة", style: TextStyle(fontSize: 16, color: Colors.grey)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: myOrders.length,
-                  itemBuilder: (context, index) {
-                    return _buildOrderCard(myOrders[index]);
-                  },
-                ),
-
-      // --- 3. الشريط السفلي (مطابق للتصميم) ---
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-        ),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: tealColor, // الخلفية خضراء (Teal)
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white70,
-          currentIndex: 3, // نحدد أننا في صفحة "طلباتي"
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              label: "الرئيسية",
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart_outlined),
-              label: "السلة",
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              label: "الحساب",
-            ),
-            BottomNavigationBarItem(
-              // تصميم الأيقونة النشطة (دائرة برتقالية)
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: orangeColor, // البرتقالي
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.receipt_long, color: Colors.white, size: 20),
+    // 1. حذفنا Scaffold و AppBar لأن MainScreen تتحكم فيهم
+    // نبدأ مباشرة بـ Column أو Container
+    return Column(
+      children: [
+        // --- عنوان جميل بسيط ---
+        Container(
+          padding: const EdgeInsets.all(20),
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "طلباتي السابقة",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
               ),
-              label: "طلباتي",
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              label: "المحفظة",
-            ),
-          ],
-          onTap: (index) {
-             // منطق التنقل يتم عبر MainScreen عادةً، 
-             // أو يمكنك استخدام Navigator هنا للانتقال للصفحات الأخرى
-             if (index == 4) Navigator.pushNamed(context, '/wallet');
-             if (index == 0) Navigator.pushNamed(context, '/main');
-          },
+              Text(
+                "تابع حالة طلباتك أو اطلب مرة أخرى",
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
         ),
+
+        // --- قائمة الطلبات ---
+        Expanded(
+          child: isLoading
+              ? Center(child: CircularProgressIndicator(color: tealColor))
+              : myOrders.isEmpty
+                  ? _buildEmptyState()
+                  : RefreshIndicator(
+                      onRefresh: fetchOrders,
+                      color: tealColor,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: myOrders.length,
+                        itemBuilder: (context, index) {
+                          return _buildOrderCard(myOrders[index]);
+                        },
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // تصميم الحالة الفارغة
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.receipt_long_outlined, size: 80, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            "لا توجد طلبات حتى الآن",
+            style: TextStyle(fontSize: 18, color: Colors.grey[600], fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text("اطلب أكلتك المفضلة الآن واستمتع!", style: TextStyle(color: Colors.grey)),
+        ],
       ),
     );
   }
 
-  // --- 4. تصميم بطاقة الطلب ---
+  // --- تصميم بطاقة الطلب (محسن جداً) ---
   Widget _buildOrderCard(OrderModel order) {
-    final statusStyle = getStatusStyle(order.status);
+    final statusData = getStatusStyle(order.status);
     
-    // تحويل التاريخ (معالجة الخطأ المحتمل في التنسيق)
     DateTime orderDate;
     try {
       orderDate = DateTime.parse(order.createdAt);
     } catch (_) {
       orderDate = DateTime.now();
     }
-    final dateStr = intl.DateFormat('yyyy-MM-dd • hh:mm a').format(orderDate);
+    // تنسيق الوقت ليكون مقروءاً (مثال: منذ 5 دقائق)
+    final dateStr = intl.DateFormat('d MMM, hh:mm a', 'en').format(orderDate);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          children: [
-            // الرأس: اللوجو واسم الكلية
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        children: [
+          // 1. رأس البطاقة (اسم الكلية والحالة)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: Colors.grey[100],
-                  // محاولة عرض لوغو الكلية إذا وجد
-                  backgroundImage: (order.cafeLogo != null && order.cafeLogo!.isNotEmpty) 
-                      ? NetworkImage(order.cafeLogo!) 
-                      : null,
-                  child: (order.cafeLogo == null || order.cafeLogo!.isEmpty) 
-                      ? Icon(Icons.store_mall_directory, color: tealColor) 
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        // ✅ التعديل: استخدام cafeName بدلاً من collegeName
-                        order.cafeName ?? "الكافيتيريا", 
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        dateStr,
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
-                  ),
+                      child: Icon(Icons.store_rounded, color: tealColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.cafeName ?? "مقهى الكلية", // ✅ الاسم الحقيقي للمقهى
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Text(
+                          dateStr,
+                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                // حالة الطلب (نص صغير في الأعلى)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: (statusStyle['bg'] as Color).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: statusData['bg'],
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    statusStyle['text'],
+                    statusData['text'],
                     style: TextStyle(
-                      color: statusStyle['color'],
+                      color: statusData['color'],
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -242,76 +205,117 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 ),
               ],
             ),
-            
-            const Divider(height: 24),
+          ),
 
-            // صور المنتجات (Horizontal List)
-            if (order.items.isNotEmpty)
-              SizedBox(
+          const Divider(height: 1, thickness: 0.5),
+
+          // 2. محتوى الطلب (صور المنتجات باستخدام الحيلة الذكية)
+          if (order.items.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
                 height: 60,
-                child: ListView.builder(
+                child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: order.items.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(width: 10),
                   itemBuilder: (context, i) {
-                    // ✅ التعديل: الوصول للصورة عبر items[i].productImage
-                    final imgUrl = order.items[i].productImage;
-                    return Container(
-                      width: 60,
-                      margin: const EdgeInsets.only(left: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(10),
-                        image: DecorationImage(
-                          image: NetworkImage(
-                            (imgUrl != null && imgUrl.isNotEmpty) 
-                                ? imgUrl 
-                                : "https://cdn-icons-png.flaticon.com/512/3075/3075977.png" // صورة افتراضية
+                    final item = order.items[i];
+                    // ✅ استخدام الحيلة الذكية لجلب الصورة
+                    // نفترض أن item يحتوي على productName، وإذا لم يوجد نستخدم اسم "منتج"
+                    // ملاحظة: تأكد أن OrderItemModel يحتوي على حقل لاسم المنتج
+                    // هنا سنفترض أن item.productImage يأتي من السيرفر، وإذا لا نستخدم الاسم
+                    final imgPath = SmartImageUtil.getImagePath(
+                      item.productName ?? "burger", // استخدم اسم المنتج هنا
+                      item.productImage
+                    );
+                    final isNetwork = SmartImageUtil.isNetworkImage(imgPath);
+
+                    return Stack(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[200]!),
                           ),
-                          fit: BoxFit.cover,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: isNetwork
+                                ? Image.network(imgPath, fit: BoxFit.cover)
+                                : Image.asset(imgPath, fit: BoxFit.cover),
+                          ),
                         ),
-                      ),
+                        // دائرة الكمية
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.black87,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              "${item.quantity}x",
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
               ),
+            ),
 
-            const SizedBox(height: 16),
-
-            // الزر السفلي (الحالة والسعر)
-            Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: statusStyle['bg'], // لون الخلفية يتغير حسب الحالة
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // 3. الفوتر (السعر وزر إعادة الطلب)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text("الإجمالي", style: TextStyle(color: Colors.grey, fontSize: 12)),
                     Text(
-                      statusStyle['text'],
-                      style: const TextStyle(
-                        color: Colors.white,
+                      "${order.totalPrice.toStringAsFixed(2)} د.ل",
+                      style: TextStyle(
+                        color: tealColor,
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    Text(
-                      // ✅ التعديل: استخدام totalPrice بدلاً من amount
-                      "${order.totalPrice.toStringAsFixed(1)} د.ل",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 18,
                       ),
                     ),
                   ],
                 ),
-              ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // ميزة مستقبلية: إعادة الطلب
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("سيتم تفعيل ميزة إعادة الطلب قريباً")),
+                    );
+                  },
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text("اطلب مرة أخرى"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                    side: BorderSide(color: Colors.grey[300]!),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/providers/cart_provider.dart';
-import 'package:reveal_app/app/data/models/product_model.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -68,7 +67,6 @@ class _CartScreenState extends State<CartScreen> {
                   separatorBuilder: (c, i) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = cartItems[index];
-
                     return Dismissible(
                       key: ValueKey(item.id),
                       direction: DismissDirection.endToStart,
@@ -87,11 +85,7 @@ class _CartScreenState extends State<CartScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withValues(alpha: 0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
+                            BoxShadow(color: Colors.grey.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
                           ],
                         ),
                         child: Padding(
@@ -105,39 +99,19 @@ class _CartScreenState extends State<CartScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   color: Colors.grey[100],
                                   image: item.imageUrl.isNotEmpty
-                                      ? DecorationImage(
-                                          image: NetworkImage(item.imageUrl),
-                                          fit: BoxFit.cover,
-                                        )
+                                      ? DecorationImage(image: NetworkImage(item.imageUrl), fit: BoxFit.cover)
                                       : null,
                                 ),
-                                child: item.imageUrl.isEmpty
-                                    ? const Icon(Icons.fastfood, color: Colors.grey)
-                                    : null,
+                                child: item.imageUrl.isEmpty ? const Icon(Icons.fastfood, color: Colors.grey) : null,
                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      item.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                    Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      '${(item.price * item.quantity).toStringAsFixed(2)} د.ل',
-                                      style: const TextStyle(
-                                        color: Color(0xFF2DBA9D),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
+                                    Text('${(item.price * item.quantity).toStringAsFixed(2)} د.ل', style: const TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold, fontSize: 14)),
                                   ],
                                 ),
                               ),
@@ -151,33 +125,12 @@ class _CartScreenState extends State<CartScreen> {
                                   children: [
                                     InkWell(
                                       onTap: () => cart.removeSingleItem(item.id),
-                                      child: const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        child: Icon(Icons.remove, size: 18, color: Colors.grey),
-                                      ),
+                                      child: const Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4), child: Icon(Icons.remove, size: 18, color: Colors.grey)),
                                     ),
-                                    Text(
-                                      '${item.quantity}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                    ),
+                                    Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                     InkWell(
-                                      onTap: () {
-                                        final product = ProductModel(
-                                          id: item.id,
-                                          name: item.name,
-                                          price: item.price,
-                                          imageUrl: item.imageUrl,
-                                          description: '',
-                                          category: '',
-                                          collegeId: item.collegeId,
-                                          collegeName: item.collegeName,
-                                        );
-                                        cart.addItem(product);
-                                      },
-                                      child: const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        child: Icon(Icons.add, size: 18, color: Color(0xFF2DBA9D)),
-                                      ),
+                                      onTap: () => cart.incrementItem(item.id), // ✅ تم استدعاء الدالة بشكل صحيح
+                                      child: const Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4), child: Icon(Icons.add, size: 18, color: Color(0xFF2DBA9D))),
                                     ),
                                   ],
                                 ),
@@ -195,31 +148,15 @@ class _CartScreenState extends State<CartScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, -5),
-                    ),
-                  ],
+                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 20, offset: const Offset(0, -5))],
                 ),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'الإجمالي الكلي:',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-                        ),
-                        Text(
-                          '${cart.totalAmount.toStringAsFixed(2)} د.ل',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2DBA9D),
-                          ),
-                        ),
+                        const Text('الإجمالي الكلي:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        Text('${cart.totalAmount.toStringAsFixed(2)} د.ل', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2DBA9D))),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -232,18 +169,8 @@ class _CartScreenState extends State<CartScreen> {
                           backgroundColor: const Color(0xFF2DBA9D),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 5,
-                          shadowColor: const Color(0xFF2DBA9D).withValues(alpha: 0.4),
                         ),
-                        child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                                'تأكيد الطلب',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
+                        child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('تأكيد الطلب', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                       ),
                     ),
                   ],
@@ -258,55 +185,27 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _handleCheckout(BuildContext context, CartProvider cart) async {
     setState(() => _isLoading = true);
-
     try {
       final success = await cart.checkout();
-
       if (!context.mounted) return;
-
       if (success) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 60),
-            content: const Text(
-              'تم تأكيد الطلب!\nسنبدأ في تحضير طلبك الآن.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16),
-            ),
+            content: const Text('تم تأكيد الطلب!\nسنبدأ في تحضير طلبك الآن.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
             actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context);
-                },
-                child: const Text('حسناً', style: TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold)),
-              ),
+              TextButton(onPressed: () {Navigator.pop(ctx); Navigator.pop(context);}, child: const Text('حسناً', style: TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold))),
             ],
           ),
         );
       }
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 10),
-              Expanded(child: Text('حدث خطأ: ${e.toString()}')),
-            ],
-          ),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: ${e.toString()}'), backgroundColor: Colors.redAccent));
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -317,17 +216,8 @@ class _CartScreenState extends State<CartScreen> {
         title: const Text('مسح السلة'),
         content: const Text('هل تريد مسح جميع المنتجات من السلة؟'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () {
-              cart.clear();
-              Navigator.pop(ctx);
-            },
-            child: const Text('مسح الكل', style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء', style: TextStyle(color: Colors.grey))),
+          TextButton(onPressed: () {cart.clear(); Navigator.pop(ctx);}, child: const Text('مسح الكل', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
