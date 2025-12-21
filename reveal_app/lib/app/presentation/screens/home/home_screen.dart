@@ -231,11 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         title: const Text("المطاعم", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         leading: Icon(Icons.favorite, color: orangeColor), // مجرد أيقونة هنا
-        actions: [
-          IconButton(icon: const Icon(Icons.menu, color: Colors.black), onPressed: () => Scaffold.of(context).openDrawer()),
-        ],
-      ),
-      drawer: const Drawer(child: Center(child: Text("القائمة الجانبية في MainScreen"))),
+),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: tealColor))
           : SingleChildScrollView(

@@ -158,14 +158,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           // زر القائمة الجانبية (Custom AppBar)
                           Positioned(
                             top: 40,
-                            right: 16,
-                            child: IconButton(
-                              icon: const Icon(Icons.menu, color: Colors.white, size: 28),
-                              onPressed: () => Scaffold.of(context).openDrawer(),
-                            ),
-                          ),
-                          Positioned(
-                            top: 40,
                             left: 16,
                             child: const Text(
                               "حسابي",
@@ -297,7 +289,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
       
       // القائمة الجانبية (نفس الموجودة في MainScreen)
-      drawer: const Drawer(child: Center(child: Text("استخدم القائمة في الرئيسية"))),
     );
   }
 
