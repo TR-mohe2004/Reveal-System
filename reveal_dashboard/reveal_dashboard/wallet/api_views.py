@@ -2,7 +2,7 @@ from decimal import Decimal
 from django.db import transaction
 from firebase_admin import auth as fb_auth
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -40,12 +40,24 @@ def verify_token_get_user(request):
     except Exception as e:
         raise ValueError(f"Token validation error: {str(e)}")
 
+def get_request_user(request):
+    """
+    Prefer DRF Token auth (request.user). Fall back to Firebase Bearer token if present.
+    """
+    if hasattr(request, 'user') and request.user and request.user.is_authenticated:
+        return request.user
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if auth_header.startswith('Bearer '):
+        return verify_token_get_user(request)
+    raise ValueError("Missing Authorization Header")
+
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny]) # We handle auth manually via Firebase Token
 def get_wallet(request):
     try:
-        user = verify_token_get_user(request)
+        user = get_request_user(request)
     except Exception as e:
         return Response({'error': str(e)}, status=401)
 
@@ -68,7 +80,7 @@ def get_wallet(request):
 @permission_classes([AllowAny])
 def link_wallet(request):
     try:
-        user = verify_token_get_user(request)
+        user = get_request_user(request)
     except Exception as e:
         return Response({'error': str(e)}, status=401)
 
@@ -96,7 +108,7 @@ def topup_wallet(request):
     شحن المحفظة (لأغراض الاختبار أو إذا كان هناك بوابة دفع).
     """
     try:
-        user = verify_token_get_user(request)
+        user = get_request_user(request)
     except Exception as e:
         return Response({'error': str(e)}, status=401)
 

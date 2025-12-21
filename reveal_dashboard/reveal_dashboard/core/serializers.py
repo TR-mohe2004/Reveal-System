@@ -52,8 +52,8 @@ class ProductSerializer(serializers.ModelSerializer):
     cafe = CafeSerializer(read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
     cafe_name = serializers.CharField(source='cafe.name', read_only=True)
-    category_id = serializers.IntegerField(source='category_id', read_only=True)
-    cafe_id = serializers.IntegerField(source='cafe_id', read_only=True)
+    category_id = serializers.IntegerField(read_only=True)
+    cafe_id = serializers.IntegerField(read_only=True)
     image = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
 
