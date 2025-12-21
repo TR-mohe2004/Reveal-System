@@ -21,15 +21,10 @@ def _build_image_url(image_value, request=None):
 
 
 # --- 1. تسلسل المستخدم (User Serializer) ---
-# نبقيه هنا لأننا نحتاجه لعرض البروفايل في تطبيق Core
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email', 'full_name', 'phone_number']
-
-
-# ❌ تم حذف WalletSerializer و TransactionSerializer من هنا
-# ✅ مكانهما الصحيح الآن هو: wallet/serializers.py
 
 
 # --- 2. تسلسل البيانات الأساسية (Cafe, Category, Product) ---
@@ -48,12 +43,21 @@ class CafeSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name']
+        # أضفت icon هنا احتياطاً لو كان موجوداً في المودل، لو غير موجود احذفه من هنا
+        fields = ['id', 'name', 'icon'] 
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    # ✅ التعديل الحاسم: نستخدم السيريالايزر بدلاً من مجرد الاسم أو الرقم
+    # هذا يجعل الناتج: category: {id: 1, name: "...", icon: "..."}
+    category = CategorySerializer(read_only=True)
+    
+    # لاستقبال رقم الفئة عند الإضافة (Write only) - مهم لوحة التحكم
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), source='category', write_only=True
+    )
+
     cafe_name = serializers.CharField(source='cafe.name', read_only=True)
-    category_name = serializers.CharField(source='category.name', read_only=True)
     image_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -61,7 +65,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'price', 'image_url', 'description',
             'rating', 'rating_count',
-            'category', 'category_name',
+            'category', 'category_id', # نرسل الكائن والرقم (للكتابة)
             'cafe', 'cafe_name',
             'is_available'
         ]

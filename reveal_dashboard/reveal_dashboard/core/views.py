@@ -236,13 +236,12 @@ def create_order(request):
             target_cafe_id = cafes.pop()
 
             # 4. ✅ إنشاء المعاملة المالية (هنا يتم الخصم تلقائياً بواسطة مودل Transaction)
-            # ⚠️ ملاحظة: لا تقم بخصم الرصيد يدوياً هنا لتجنب الخصم المزدوج
             Transaction.objects.create(
                 wallet=wallet,
                 amount=total_price,
                 transaction_type='WITHDRAWAL',
                 source='APP',
-                description=f'طلب جديد' # سنحدث الرقم لاحقاً أو نتركه هكذا
+                description=f'طلب جديد'
             )
 
             # 5. إنشاء الطلب
@@ -267,10 +266,6 @@ def create_order(request):
                     quantity=qty,
                     price=product.price
                 )
-            
-            # تحديث وصف المعاملة برقم الطلب (اختياري)
-            # transaction_obj.description = f"طلب #{new_order.order_number}"
-            # transaction_obj.save()
 
         # إرسال إشعار (خارج الـ atomic block لتجنب التأخير)
         try:
@@ -346,17 +341,27 @@ def custom_logout(request):
 
 @login_required(login_url='core:login')
 def dashboard(request):
+    """
+    لوحة التحكم الرئيسية: تعرض الإحصائيات + المنتجات المتاحة (لحل مشكلة اختفاء الصناديق)
+    """
     cafe = get_cafe_for_user(request.user)
     
     products_count = 0
     orders_count = 0
+    # ✅ قائمة المنتجات لعرضها في الصناديق
+    products_list = [] 
     
     if cafe:
         products_count = Product.objects.filter(cafe=cafe).count()
         orders_count = Order.objects.filter(cafe=cafe).count()
         wallets_count = Wallet.objects.count()
+        # جلب المنتجات للمقهى الحالي
+        products_list = Product.objects.filter(cafe=cafe, is_available=True).order_by('-created_at')[:20]
     else:
         wallets_count = Wallet.objects.count()
+        # إذا كان سوبر يوزر، قد يرغب برؤية منتجات عامة أو فارغة
+        if request.user.is_superuser:
+             products_list = Product.objects.filter(is_available=True).order_by('-created_at')[:20]
 
     context = {
         'total_products': products_count,
@@ -364,6 +369,7 @@ def dashboard(request):
         'total_wallets': wallets_count,
         'user': request.user,
         'cafe_name': cafe.name if cafe else "لوحة الإدارة العامة",
+        'products': products_list, # ✅ تم تمرير المنتجات هنا ليراها ملف dashboard.html
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -515,7 +521,7 @@ def edit_product(request, product_id):
                 updated_product.cafe = my_cafe # Ensure ownership
                 
                 if not updated_product.image and not updated_product.image_url:
-                      updated_product.image = get_smart_image_for_product(updated_product.name)
+                       updated_product.image = get_smart_image_for_product(updated_product.name)
                       
                 updated_product.save()
                 messages.success(request, "✅ تم التعديل بنجاح")

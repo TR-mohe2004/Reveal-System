@@ -5,43 +5,28 @@ from decimal import Decimal
 from django.db import transaction
 from django.core.cache import cache
 from django.conf import settings
-from firebase_admin import auth as fb_auth
 
-# ✅ استدعاءات صحيحة من التطبيقات الأخرى
+# ✅ استدعاءات صحيحة (مودلز جانغو فقط)
 from .models import Product, Order, OrderItem, Cafe
 from wallet.models import Wallet, Transaction
 from .serializers import ProductSerializer, OrderSerializer, CafeSerializer, UserSerializer
 from .utils import send_real_notification
-from services.payment_service import execute_purchase_transaction
 
+# ❌ تم حذف استدعاء payment_service_OLD لأنه يسبب تضارباً
+# ❌ تم حذف firebase_admin لأننا نعتمد على توكن جانغو
 
-def verify_token_get_phone(request):
-    """
-    يتحقق من Firebase ID Token ويعيد رقم الهاتف.
-    """
-    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-    if not auth_header.startswith('Bearer '):
-        raise ValueError("Missing Authorization")
-    token = auth_header.split(' ', 1)[1]
-    decoded = fb_auth.verify_id_token(token)
-    phone = decoded.get('phone_number')
-    if not phone:
-        raise ValueError("Missing phone in token")
-    return phone
-
-
+# --- Caching Setup (ممتاز، أبقينا عليه) ---
 PRODUCTS_CACHE_KEY = "products:list"
 PRODUCTS_TTL = 1800  # 30 دقيقة
-
 
 def get_products_cached():
     cached = cache.get(PRODUCTS_CACHE_KEY)
     if cached:
         return cached
+    # جلب المنتجات من قاعدة بيانات SQL
     products = list(Product.objects.select_related('cafe', 'category').filter(is_available=True).order_by('-created_at'))
     cache.set(PRODUCTS_CACHE_KEY, products, PRODUCTS_TTL)
     return products
-
 
 def invalidate_products_cache():
     cache.delete(PRODUCTS_CACHE_KEY)
@@ -59,12 +44,17 @@ def get_cafes_list(request):
 @permission_classes([AllowAny])
 def get_products(request):
     cafe_id = request.GET.get('cafe_id')
-    if not cafe_id:
-        return Response({'error': 'cafe_id مطلوب'}, status=400)
+    
+    # 1. جلب المنتجات (سواء من الكاش أو الداتابيز)
+    # ملاحظة: إذا لم يحدد cafe_id نرسل الكل أو فارغ حسب سياستك
+    all_products = get_products_cached()
+    
+    if cafe_id:
+        products = [p for p in all_products if str(p.cafe_id) == str(cafe_id)]
+    else:
+        products = all_products # أو [] إذا أردت إجبار اختيار المقهى
 
-    # تصفية المنتجات حسب الكلية المطلوبة
-    products = [p for p in get_products_cached() if str(p.cafe_id) == str(cafe_id)]
-
+    # 2. التصفية (Filtering)
     category_id = request.GET.get('category_id')
     category_name = request.GET.get('category') or request.GET.get('category_name')
     available_only = request.GET.get('available')
@@ -91,6 +81,10 @@ def get_user_profile(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_order(request):
+    """
+    ✅ هذه هي دالة الشراء الوحيدة المعتمدة.
+    تقوم بالخصم من المحفظة وإنشاء الطلب في نفس الوقت داخل قاعدة بيانات Django.
+    """
     user = request.user
     total_price_raw = request.data.get('total_price')
     items_data = request.data.get('items')
@@ -108,14 +102,14 @@ def create_order(request):
 
     try:
         with transaction.atomic():
-            # قفل المحفظة لمنع التضارب، لكن لا نخصم يدوياً
+            # 1. قفل المحفظة وجلبها
             wallet = Wallet.objects.select_for_update().get(user=user)
             
-            # التحقق المبدئي من الرصيد
+            # 2. التحقق من الرصيد
             if wallet.balance < total_price:
                 return Response({'error': 'الرصيد غير كافٍ'}, status=400)
 
-            # التحقق من أن المنتجات تتبع نفس المقهى
+            # 3. التحقق من المنتجات (يجب أن تكون من نفس المقهى)
             product_ids = [item.get('product_id') for item in items_data]
             products = Product.objects.filter(id__in=product_ids).select_related('cafe')
             
@@ -127,19 +121,17 @@ def create_order(request):
                 return Response({'error': 'كل عناصر السلة يجب أن تتبع نفس المقهى'}, status=400)
             target_cafe_id = cafes.pop()
 
-            # ❌ حذفنا الخصم اليدوي من هنا (wallet.balance -= total_price)
-            # لأن السطر التالي (إنشاء Transaction) سيقوم بالمهمة تلقائياً عبر المودل
-            
-            # 1. إنشاء سجل المعاملة (هذا سيخصم الرصيد تلقائياً)
+            # 4. ✅ إنشاء المعاملة المالية (Transaction Model)
+            # هذا الإجراء سيقوم بخصم الرصيد تلقائياً لأننا برمجنا ذلك في المودل
             Transaction.objects.create(
                 wallet=wallet,
                 amount=total_price,
                 transaction_type='WITHDRAWAL',
                 source='APP',
-                description=f'طلب جديد' # سنحدث الرقم لاحقاً أو نتركه هكذا
+                description='طلب تطبيق'
             )
 
-            # 2. إنشاء الطلب
+            # 5. إنشاء الطلب (Order Model)
             new_order = Order.objects.create(
                 user=user,
                 cafe_id=target_cafe_id,
@@ -147,10 +139,11 @@ def create_order(request):
                 status='PENDING'
             )
 
-            # 3. إنشاء تفاصيل الطلب
+            # 6. إضافة العناصر (Order Items)
             for item in items_data:
                 product_id = item.get('product_id')
                 qty = item.get('quantity', item.get('qty', 1))
+                # البحث عن المنتج في القائمة التي جلبناها سابقاً لتقليل الاستعلامات
                 product = next((p for p in products if str(p.id) == str(product_id)), None)
                 
                 OrderItem.objects.create(
@@ -160,7 +153,7 @@ def create_order(request):
                     price=product.price
                 )
 
-        # إرسال الإشعار (خارج الترانزكشن)
+        # إرسال الإشعار (خارج الترانزكشن لتسريع الاستجابة)
         try:
             send_real_notification(user, "تم استلام طلبك", f"طلبك #{new_order.order_number} قيد المعالجة.")
         except:
@@ -171,11 +164,10 @@ def create_order(request):
     except Wallet.DoesNotExist:
         return Response({'error': 'المحفظة غير موجودة، يرجى التواصل مع الدعم'}, status=404)
     except ValueError as e:
-        # التقاط أخطاء الرصيد من المودل
         return Response({'error': str(e)}, status=400)
     except Exception as e:
         print(f"Order Error: {e}")
-        return Response({'error': str(e)}, status=500)
+        return Response({'error': 'حدث خطأ غير متوقع'}, status=500)
 
 
 @api_view(['GET'])
@@ -193,40 +185,8 @@ def orders_endpoint(request):
     نقطة تجمع الطلبات لعرضها أو إنشائها.
     """
     if request.method == 'GET':
+        # تمرير الطلب الأصلي لتجنب مشاكل الصلاحيات
         return get_user_orders(request._request)
     return create_order(request._request)
 
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def api_purchase(request):
-    """
-    نقطة الشراء الخاصة بـ Firestore (منفصلة عن المحفظة المحلية)
-    """
-    try:
-        phone = verify_token_get_phone(request)
-    except Exception as e:
-        return Response({'error': str(e)}, status=401)
-
-    items = request.data.get('items', [])
-    if not items:
-        return Response({'error': 'items required'}, status=400)
-
-    try:
-        total_price = float(request.data.get('total_price', 0)) or sum(
-            float(i.get('price', 0)) * float(i.get('quantity', i.get('qty', 1))) for i in items
-        )
-    except Exception:
-        return Response({'error': 'invalid pricing data'}, status=400)
-
-    if not settings.FIRESTORE_DB:
-        return Response({'error': 'payment service unavailable'}, status=503)
-
-    try:
-        new_balance = execute_purchase_transaction(settings.FIRESTORE_DB, phone, total_price, items)
-        return Response({'message': 'success', 'balance': new_balance})
-    except ValueError as e:
-        return Response({'error': str(e)}, status=400)
-    except Exception as e:
-        print("Purchase error:", e)
-        return Response({'error': 'internal'}, status=500)
+# ❌ تم حذف api_purchase نهائياً لأنه يعتمد على Firebase
