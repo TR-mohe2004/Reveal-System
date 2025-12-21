@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import api_views, views  # views لاستيراد api_login/signup
+from . import api_views, views
 
 # لا حاجة لتعريف app_name هنا لأننا سنضمنه ببادئة api/
 
@@ -17,13 +17,8 @@ urlpatterns = [
 
     # --- الطلبات (Orders) ---
     path('orders/', api_views.orders_endpoint, name='api_orders'),
-    # رابط إضافي لإنشاء الطلب بشكل صريح (اختياري)
     path('orders/create/', api_views.create_order, name='api_create_order'),
 
-    # --- الدفع والشراء (✅ الرابط المهم جداً) ---
-    path('purchase/', api_views.api_purchase, name='api_purchase'),
-
     # --- المحفظة (Wallet) ---
-    # نستخدم include لترتيب الكود، تأكد أن wallet/api_urls.py موجود
     path('wallet/', include('wallet.api_urls')),
 ]
