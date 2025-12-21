@@ -33,9 +33,15 @@ def get_cafe_for_user(user):
     جلب المقهى المرتبط بالمستخدم، أو أول مقهى للأدمن.
     """
     cafe = getattr(user, 'my_cafe', None)
-    if not cafe and user.is_superuser:
-        cafe = Cafe.objects.first()
-    return cafe
+    if cafe:
+        return cafe
+    if user.is_superuser:
+        return Cafe.objects.first()
+    if user.is_staff:
+        active_cafes = Cafe.objects.filter(is_active=True)
+        if active_cafes.count() == 1:
+            return active_cafes.first()
+    return None
 
 def ensure_categories_for_cafe(cafe):
     """
@@ -365,6 +371,7 @@ def dashboard(request):
 
     context = {
         'total_products': products_count,
+        'orders_count': orders_count,
         'total_cafes': Cafe.objects.count() if request.user.is_superuser else (1 if cafe else 0),
         'total_wallets': wallets_count,
         'user': request.user,

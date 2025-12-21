@@ -44,31 +44,32 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         # أضفت icon هنا احتياطاً لو كان موجوداً في المودل، لو غير موجود احذفه من هنا
-        fields = ['id', 'name', 'icon'] 
+        fields = ['id', 'name']
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    # ✅ التعديل الحاسم: نستخدم السيريالايزر بدلاً من مجرد الاسم أو الرقم
-    # هذا يجعل الناتج: category: {id: 1, name: "...", icon: "..."}
     category = CategorySerializer(read_only=True)
-    
-    # لاستقبال رقم الفئة عند الإضافة (Write only) - مهم لوحة التحكم
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), source='category', write_only=True
-    )
-
+    cafe = CafeSerializer(read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
     cafe_name = serializers.CharField(source='cafe.name', read_only=True)
+    category_id = serializers.IntegerField(source='category_id', read_only=True)
+    cafe_id = serializers.IntegerField(source='cafe_id', read_only=True)
+    image = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'price', 'image_url', 'description',
+            'id', 'name', 'price', 'image', 'image_url', 'description',
             'rating', 'rating_count',
-            'category', 'category_id', # نرسل الكائن والرقم (للكتابة)
-            'cafe', 'cafe_name',
+            'category', 'category_name', 'category_id',
+            'cafe', 'cafe_name', 'cafe_id',
             'is_available'
         ]
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        return _build_image_url(obj.image, request)
 
     def get_image_url(self, obj):
         request = self.context.get('request')
