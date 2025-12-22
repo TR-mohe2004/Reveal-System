@@ -96,7 +96,8 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     cafe_name = serializers.ReadOnlyField(source='cafe.name')
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
 
     class Meta:
         model = Order
-        fields = ['id', 'order_number', 'total_price', 'status', 'status_display', 'created_at', 'cafe_name', 'items']
+        fields = ['id', 'order_number', 'total_price', 'status', 'status_display', 'payment_method', 'payment_method_display', 'created_at', 'cafe_name', 'items']

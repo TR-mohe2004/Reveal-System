@@ -79,6 +79,10 @@
                                 {% endfor %}
                             </div>
 
+                            <a href="{% url 'core:preparing_order' order.id %}" class="btn btn-sm btn-warning text-dark w-100 mb-2">
+                                <i class="fas fa-fire"></i> ??? ???????
+                            </a>
+
                             <a href="{% url 'core:ready_order' order.id %}" class="btn btn-sm btn-info text-white w-100">
                                 <i class="fas fa-truck"></i> جاهز للاستلام
                             </a>

@@ -11,22 +11,6 @@ def order_status_notification(sender, instance, created, **kwargs):
     if created:
         # إشعار عند إنشاء الطلب لأول مرة (اختياري)
         return
-
-    # إرسال إشعار حسب الحالة الجديدة
-    if instance.status == 'PREPARING':
-        send_real_notification(
-            instance.user, 
-            "جاري التحضير 👨‍🍳", 
-            f"بدأنا في تحضير طلبك #{instance.order_number}. يرجى الانتظار."
-        )
-    
-    elif instance.status == 'READY':
-        send_real_notification(
-            instance.user, 
-            "طلبك جاهز! 🍕", 
-            f"الطلب #{instance.order_number} جاهز للاستلام. صحتين!"
-        )
-
     elif instance.status == 'COMPLETED':
         send_real_notification(
             instance.user, 

@@ -69,10 +69,16 @@ class Order(models.Model):
         ('CANCELLED', 'ملغى'),
     )
 
+    PAYMENT_METHOD_CHOICES = (
+        ('WALLET', '???????'),
+        ('CASH', '???'),
+    )
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders', verbose_name="العميل")
     cafe = models.ForeignKey(Cafe, on_delete=models.CASCADE, related_name='orders', verbose_name="الكلية")
     total_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الإجمالي")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', verbose_name="الحالة")
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES, default='WALLET', verbose_name='????? ?????')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الطلب")
     order_number = models.CharField(max_length=10, unique=True, blank=True, null=True, verbose_name="رقم الطلب")
 

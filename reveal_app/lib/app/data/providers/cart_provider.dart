@@ -125,7 +125,7 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> checkout() async {
+  Future<bool> checkout({String paymentMethod = 'WALLET'}) async {
     if (_items.isEmpty) return false;
     
     final List<Map<String, dynamic>> orderItems = [];
@@ -136,7 +136,7 @@ class CartProvider extends ChangeNotifier {
     final collegeId = _items.values.first.collegeId;
 
     try {
-      await _apiService.createOrder(totalAmount, orderItems, collegeId);
+      await _apiService.createOrder(totalAmount, orderItems, collegeId, paymentMethod: paymentMethod);
       clear();
       return true;
     } catch (e) {

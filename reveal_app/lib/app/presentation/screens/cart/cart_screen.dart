@@ -11,6 +11,7 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   bool _isLoading = false;
+  String _paymentMethod = 'WALLET';
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +160,22 @@ class _CartScreenState extends State<CartScreen> {
                         Text('${cart.totalAmount.toStringAsFixed(2)} د.ل', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2DBA9D))),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '????? ?????',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildPaymentOption(value: 'WALLET', label: '???????', icon: Icons.account_balance_wallet),
+                        const SizedBox(width: 12),
+                        _buildPaymentOption(value: 'CASH', label: '???', icon: Icons.payments),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
@@ -183,10 +200,42 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  Widget _buildPaymentOption({required String value, required String label, required IconData icon}) {
+    final selected = _paymentMethod == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _paymentMethod = value),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF2DBA9D) : Colors.grey[100],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? const Color(0xFF2DBA9D) : Colors.grey.shade200),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: selected ? Colors.white : Colors.grey, size: 20),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleCheckout(BuildContext context, CartProvider cart) async {
     setState(() => _isLoading = true);
     try {
-      final success = await cart.checkout();
+      final success = await cart.checkout(paymentMethod: _paymentMethod);
       if (!context.mounted) return;
       if (success) {
         showDialog(
@@ -203,10 +252,27 @@ class _CartScreenState extends State<CartScreen> {
       }
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: ${e.toString()}'), backgroundColor: Colors.redAccent));
+      final message = _friendlyOrderError(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _friendlyOrderError(Object error) {
+    final message = error.toString();
+    if (message.contains('401') || message.contains('Not authenticated') || message.contains('Unauthorized')) {
+      return 'انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.';
+    }
+    if (message.contains('balance') || message.contains('رصيد') || message.contains('wallet')) {
+      return 'رصيد المحفظة غير كافٍ لإتمام الطلب.';
+    }
+    if (message.contains('مقهى') || message.contains('cafe') || message.contains('single')) {
+      return 'الطلب يجب أن يكون من مقهى واحد.';
+    }
+    return 'تعذر إرسال الطلب. حاول مرة أخرى.';
   }
 
   void _showClearCartDialog(BuildContext context, CartProvider cart) {

@@ -60,11 +60,13 @@ class ProductModel {
     // 3. معالجة المقهى والكلية
     String cfName = (json['cafe_name'] ?? '').toString();
     String clgName = (json['college_name'] ?? '').toString();
-    String clgId = (json['college_id'] ?? json['college'] ?? '1').toString();
+    String cfId = (json['cafe_id'] ?? '').toString();
+    String clgId = (json['college_id'] ?? json['college'] ?? cfId ?? '1').toString();
     
     // إذا كان المقهى يأتي ككائن متداخل
     if (json['cafe'] is Map) {
       cfName = json['cafe']['name']?.toString() ?? cfName;
+      cfId = json['cafe']['id']?.toString() ?? cfId;
       // محاولة استخراج الكلية من داخل المقهى إذا وجدت
       if (json['cafe']['college'] != null) {
          // منطق إضافي حسب شكل الباك اند الخاص بك
@@ -81,7 +83,7 @@ class ProductModel {
       category: catName,
       categoryId: catId,
       
-      cafeId: json['cafe_id']?.toString() ?? '',
+      cafeId: cfId,
       cafeName: cfName.isNotEmpty ? cfName : "مقهى الكلية",
       
       collegeId: clgId,

@@ -6,7 +6,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.utils import timezone
+from django.db.models import Q, Sum
 from decimal import Decimal
 import re
 
@@ -205,15 +206,24 @@ def get_user_profile(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_order(request):
+    """
+    ????? ????? ?? ??? ????? ??? ??????? ?? ???.
+    """
     user = request.user
     total_price_raw = request.data.get('total_price')
     items_data = request.data.get('items')
+    payment_method = request.data.get('payment_method', 'WALLET')
+
+    if isinstance(payment_method, str):
+        payment_method = payment_method.strip().upper()
+    if payment_method not in ['WALLET', 'CASH']:
+        payment_method = 'WALLET'
 
     if total_price_raw is None or not items_data:
-        return Response({'error': 'إجمالي الطلب أو العناصر مفقود'}, status=400)
+        return Response({'error': '???? ????? ????? ?????????.'}, status=400)
 
     if len(items_data) == 0:
-        return Response({'error': 'السلة فارغة'}, status=400)
+        return Response({'error': '????? ?????.'}, status=400)
 
     try:
         total_price = Decimal(str(total_price_raw))
@@ -222,50 +232,50 @@ def create_order(request):
 
     try:
         with transaction.atomic():
-            # 1. قفل المحفظة لمنع التضارب
-            try:
-                wallet = Wallet.objects.select_for_update().get(user=user)
-            except Wallet.DoesNotExist:
-                return Response({'error': 'المحفظة غير موجودة'}, status=404)
-
-            # 2. التحقق المبدئي من الرصيد
-            if wallet.balance < total_price:
-                return Response({'error': 'الرصيد غير كافٍ'}, status=400)
-
-            # 3. التحقق من المنتجات والمقهى
             product_ids = [item.get('product_id') for item in items_data]
-            products = Product.objects.filter(id__in=product_ids).select_related('cafe')
+            products = list(Product.objects.filter(id__in=product_ids).select_related('cafe'))
+
+            if len(products) != len(set(product_ids)):
+                return Response({'error': '???? ??? ?????.'}, status=400)
+
             cafes = {p.cafe_id for p in products}
-            
-            if not products or len(cafes) != 1:
-                return Response({'error': 'كل عناصر السلة يجب أن تتبع نفس المقهى'}, status=400)
+            if len(cafes) != 1:
+                return Response({'error': '??? ?? ???? ???? ???????? ?? ??? ??????.'}, status=400)
             target_cafe_id = cafes.pop()
 
-            # 4. ✅ إنشاء المعاملة المالية (هنا يتم الخصم تلقائياً بواسطة مودل Transaction)
-            Transaction.objects.create(
-                wallet=wallet,
-                amount=total_price,
-                transaction_type='WITHDRAWAL',
-                source='APP',
-                description=f'طلب جديد'
-            )
+            if payment_method == 'WALLET':
+                try:
+                    wallet = Wallet.objects.select_for_update().get(user=user)
+                except Wallet.DoesNotExist:
+                    return Response({'error': '??????? ??? ??????.'}, status=404)
 
-            # 5. إنشاء الطلب
+                if wallet.balance < total_price:
+                    return Response({'error': '???? ??????? ??? ????.'}, status=400)
+
+                Transaction.objects.create(
+                    wallet=wallet,
+                    amount=total_price,
+                    transaction_type='WITHDRAWAL',
+                    source='APP',
+                    description='??? ????'
+                )
+
             new_order = Order.objects.create(
                 user=user,
                 cafe_id=target_cafe_id,
                 total_price=total_price,
-                status='PENDING'
+                status='PENDING',
+                payment_method=payment_method
             )
 
-            # 6. إضافة العناصر للطلب
             for item in items_data:
                 product_id = item.get('product_id')
                 qty = item.get('quantity', item.get('qty', 1))
-                product = products.filter(id=product_id).first()
+                product = next((p for p in products if str(p.id) == str(product_id)), None)
+
                 if not product:
-                    raise Product.DoesNotExist()
-                
+                    return Response({'error': '???? ??? ?????.'}, status=400)
+
                 OrderItem.objects.create(
                     order=new_order,
                     product=product,
@@ -273,22 +283,16 @@ def create_order(request):
                     price=product.price
                 )
 
-        # إرسال إشعار (خارج الـ atomic block لتجنب التأخير)
         try:
-            send_real_notification(user, "تم استلام طلبك", f"طلبك #{new_order.order_number} قيد المعالجة.")
-        except:
+            send_real_notification(user, "?? ?????? ????", f"???? #{new_order.order_number} ??? ????????.")
+        except Exception:
             pass
 
-        return Response({'message': 'تم إنشاء الطلب بنجاح', 'order_id': new_order.id}, status=201)   
+        return Response({'message': '?? ????? ????? ?????', 'order_id': new_order.id}, status=201)
 
-    except Product.DoesNotExist:
-        return Response({'error': 'منتج غير متوفر'}, status=400)
-    except ValueError as e:
-         return Response({'error': str(e)}, status=400) # لالتقاط أخطاء الرصيد من المودل
     except Exception as e:
         print(f"Order Error: {e}")
-        return Response({'error': str(e)}, status=500)
-
+        return Response({'error': '??? ??? ????? ????? ?????.'}, status=500)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -404,10 +408,12 @@ def products(request):
 def orders(request):
     cafe = get_cafe_for_user(request.user)
     
-    if not cafe:
-         return render(request, 'core/orders.html', {'orders': [], 'new_orders': [], 'preparing_orders': [], 'ready_orders': []})
-
-    all_orders = Order.objects.filter(cafe=cafe).order_by('-created_at')
+    if request.user.is_superuser:
+        all_orders = Order.objects.all().order_by('-created_at')
+    elif not cafe:
+        return render(request, 'core/orders.html', {'orders': [], 'new_orders': [], 'preparing_orders': [], 'ready_orders': []})
+    else:
+        all_orders = Order.objects.filter(cafe=cafe).order_by('-created_at')
     context = {
         'orders': all_orders,
         'new_orders': all_orders.filter(status='PENDING'),
@@ -419,7 +425,22 @@ def orders(request):
 
 @login_required(login_url='core:login')
 def customers(request):
-    return render(request, 'core/customers.html')
+    users_qs = User.objects.all().order_by('-date_joined')
+    users = []
+    for user in users_qs:
+        if user.is_superuser:
+            role = 'super_admin'
+        elif user.is_staff:
+            role = 'manager'
+        else:
+            role = 'customer'
+        users.append({
+            'email': user.email,
+            'role': role,
+            'created_at': user.date_joined,
+            'uid': user.id,
+        })
+    return render(request, 'core/customers.html', {'users': users})
 
 
 @login_required(login_url='core:login')
@@ -429,7 +450,53 @@ def stock(request):
 
 @login_required(login_url='core:login')
 def reports(request):
-    return render(request, 'core/reports.html')
+    today = timezone.localdate()
+
+    product_count = Product.objects.count()
+    wallet_count = Wallet.objects.count()
+    total_system_balance = Wallet.objects.aggregate(total=Sum('balance'))['total'] or 0
+
+    deposits_today_qs = Transaction.objects.filter(transaction_type='DEPOSIT', created_at__date=today)
+    total_deposits_today = deposits_today_qs.aggregate(total=Sum('amount'))['total'] or 0
+    deposits_count_today = deposits_today_qs.count()
+
+    refunds_today_qs = Transaction.objects.filter(transaction_type='WITHDRAWAL', created_at__date=today)
+    total_refunds_today = refunds_today_qs.aggregate(total=Sum('amount'))['total'] or 0
+
+    latest_qs = Transaction.objects.select_related('wallet', 'wallet__user').order_by('-created_at')[:10]
+    balances = {}
+    latest_transactions = []
+
+    for trans in latest_qs:
+        wallet_id = trans.wallet_id
+        if wallet_id not in balances:
+            balances[wallet_id] = trans.wallet.balance
+
+        current_balance = balances[wallet_id]
+        latest_transactions.append({
+            'type': 'deposit' if trans.transaction_type == 'DEPOSIT' else 'refund',
+            'amount': trans.amount,
+            'wallet_owner': getattr(trans.wallet.user, 'full_name', str(trans.wallet.user)),
+            'new_balance': current_balance,
+            'timestamp': trans.created_at,
+        })
+
+        if trans.transaction_type == 'DEPOSIT':
+            balances[wallet_id] = current_balance - trans.amount
+        elif trans.transaction_type == 'WITHDRAWAL':
+            balances[wallet_id] = current_balance + trans.amount
+
+    context = {
+        'product_count': product_count,
+        'wallet_count': wallet_count,
+        'total_system_balance': total_system_balance,
+        'total_deposits_today': total_deposits_today,
+        'deposits_count_today': deposits_count_today,
+        'total_refunds_today': total_refunds_today,
+        'latest_transactions': latest_transactions,
+    }
+
+    return render(request, 'core/reports.html', context)
 
 
 @login_required(login_url='core:login')
@@ -650,9 +717,21 @@ def accept_order(request, order_id):
     if order.status == 'PENDING':
         order.status = 'PREPARING'
         order.save(update_fields=['status'])
-        # Notification handled by Signals now (or keep it here if preferred)
-        # send_real_notification(order.user, "تم قبول طلبك", f"طلبك #{order.order_number} قيد التحضير.")
+        send_real_notification(order.user, "?? ???? ???? ?????", "?? ???? ???? ?????.")
     
+    return redirect('core:orders')
+
+
+@login_required(login_url='core:login')
+def preparing_order(request, order_id):
+    cafe = get_cafe_for_user(request.user)
+    if not cafe:
+        return redirect('core:orders')
+
+    order = get_object_or_404(Order, id=order_id, cafe=cafe)
+    if order.status == 'PREPARING':
+        send_real_notification(order.user, "???? ??? ???????", "???? ??? ???????.")
+
     return redirect('core:orders')
 
 
@@ -666,6 +745,7 @@ def ready_order(request, order_id):
     if order.status == 'PREPARING':
         order.status = 'READY'
         order.save(update_fields=['status'])
+        send_real_notification(order.user, "???? ???? ????????", "???? ???? ????????.")
     
     return redirect('core:orders')
 

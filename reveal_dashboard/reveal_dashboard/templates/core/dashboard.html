@@ -9,49 +9,49 @@
 <div class="row g-3 my-2">
     
     <div class="col-md-3">
-        <a href="{% url 'core:products' %}" class="text-decoration-none text-dark">
-            <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded hover-card">
+        <a href="{% url 'core:products' %}" class="text-decoration-none text-white">
+            <div class="p-3 shadow-sm d-flex justify-content-around align-items-center rounded hover-card stat-card stat-products">
                 <div>
                     <h3 class="fs-2">{{ total_products }}</h3>
-                    <p class="fs-5">المنتجات</p>
+                    <p class="fs-5 stat-label">المنتجات</p>
                 </div>
-                <i class="fas fa-hamburger fs-1 primary-text border rounded-full secondary-bg p-3"></i>
+                <i class="fas fa-hamburger fs-1 stat-icon"></i>
             </div>
         </a>
     </div>
 
     <div class="col-md-3">
-        <a href="{% url 'core:orders' %}" class="text-decoration-none text-dark">
-            <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded hover-card">
+        <a href="{% url 'core:orders' %}" class="text-decoration-none text-white">
+            <div class="p-3 shadow-sm d-flex justify-content-around align-items-center rounded hover-card stat-card stat-orders">
                 <div>
                     <h3 class="fs-2">{{ orders_count|default:"0" }}</h3>
-                    <p class="fs-5">الطلبات</p>
+                    <p class="fs-5 stat-label">الطلبات</p>
                 </div>
-                <i class="fas fa-receipt fs-1 primary-text border rounded-full secondary-bg p-3"></i>
+                <i class="fas fa-receipt fs-1 stat-icon"></i>
             </div>
         </a>
     </div>
 
     <div class="col-md-3">
-        <a href="{% url 'core:wallets' %}" class="text-decoration-none text-dark">
-            <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded hover-card">
+        <a href="{% url 'core:wallet_recharge' %}" class="text-decoration-none text-white">
+            <div class="p-3 shadow-sm d-flex justify-content-around align-items-center rounded hover-card stat-card stat-wallets">
                 <div>
                     <h3 class="fs-2">{{ total_wallets }}</h3>
-                    <p class="fs-5">المحافظ</p>
+                    <p class="fs-5 stat-label">المحافظ</p>
                 </div>
-                <i class="fas fa-wallet fs-1 primary-text border rounded-full secondary-bg p-3"></i>
+                <i class="fas fa-wallet fs-1 stat-icon"></i>
             </div>
         </a>
     </div>
 
     <div class="col-md-3">
-        <a href="{% url 'core:reports' %}" class="text-decoration-none text-dark">
-            <div class="p-3 bg-white shadow-sm d-flex justify-content-around align-items-center rounded hover-card">
+        <a href="{% url 'core:reports' %}" class="text-decoration-none text-white">
+            <div class="p-3 shadow-sm d-flex justify-content-around align-items-center rounded hover-card stat-card stat-reports">
                 <div>
                     <h3 class="fs-2">+</h3>
-                    <p class="fs-5">التقارير</p>
+                    <p class="fs-5 stat-label">التقارير</p>
                 </div>
-                <i class="fas fa-chart-line fs-1 primary-text border rounded-full secondary-bg p-3"></i>
+                <i class="fas fa-chart-line fs-1 stat-icon"></i>
             </div>
         </a>
     </div>
@@ -109,11 +109,37 @@
     .hover-card:hover {
         transform: translateY(-5px);
         transition: all 0.3s ease;
-        border: 1px solid #009d63; /* لون أخضر جميل */
+        border: 1px solid rgba(255, 255, 255, 0.35); /* لون أخضر جميل */
     }
     .product-card:hover {
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
         transition: box-shadow 0.3s ease;
+    }
+    .stat-card {
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .stat-label {
+        opacity: 0.85;
+        margin-bottom: 0;
+    }
+    .stat-icon {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-radius: 999px;
+        padding: 0.75rem;
+    }
+    .stat-products {
+        background: linear-gradient(135deg, #0d6efd 0%, #3b82f6 100%);
+    }
+    .stat-orders {
+        background: linear-gradient(135deg, #fdba74 0%, #fb923c 100%);
+    }
+    .stat-wallets {
+        background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+    }
+    .stat-reports {
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
     }
 </style>
 {% endblock %}

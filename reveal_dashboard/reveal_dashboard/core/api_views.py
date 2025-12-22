@@ -82,18 +82,23 @@ def get_user_profile(request):
 @permission_classes([IsAuthenticated])
 def create_order(request):
     """
-    ✅ هذه هي دالة الشراء الوحيدة المعتمدة.
-    تقوم بالخصم من المحفظة وإنشاء الطلب في نفس الوقت داخل قاعدة بيانات Django.
+    ????? ????? ?? ??? ????? ??? ??????? ?? ???.
     """
     user = request.user
     total_price_raw = request.data.get('total_price')
     items_data = request.data.get('items')
+    payment_method = request.data.get('payment_method', 'WALLET')
+
+    if isinstance(payment_method, str):
+        payment_method = payment_method.strip().upper()
+    if payment_method not in ['WALLET', 'CASH']:
+        payment_method = 'WALLET'
 
     if total_price_raw is None or not items_data:
-        return Response({'error': 'إجمالي الطلب أو العناصر مفقود'}, status=400)
+        return Response({'error': '???? ????? ????? ?????????.'}, status=400)
 
     if len(items_data) == 0:
-        return Response({'error': 'السلة فارغة'}, status=400)
+        return Response({'error': '????? ?????.'}, status=400)
 
     try:
         total_price = Decimal(str(total_price_raw))
@@ -102,50 +107,50 @@ def create_order(request):
 
     try:
         with transaction.atomic():
-            # 1. قفل المحفظة وجلبها
-            wallet = Wallet.objects.select_for_update().get(user=user)
-            
-            # 2. التحقق من الرصيد
-            if wallet.balance < total_price:
-                return Response({'error': 'الرصيد غير كافٍ'}, status=400)
-
-            # 3. التحقق من المنتجات (يجب أن تكون من نفس المقهى)
             product_ids = [item.get('product_id') for item in items_data]
-            products = Product.objects.filter(id__in=product_ids).select_related('cafe')
-            
+            products = list(Product.objects.filter(id__in=product_ids).select_related('cafe'))
+
             if len(products) != len(set(product_ids)):
-                 return Response({'error': 'بعض المنتجات غير موجودة'}, status=400)
+                return Response({'error': '???? ??? ?????.'}, status=400)
 
             cafes = {p.cafe_id for p in products}
             if len(cafes) != 1:
-                return Response({'error': 'كل عناصر السلة يجب أن تتبع نفس المقهى'}, status=400)
+                return Response({'error': '??? ?? ???? ???? ???????? ?? ??? ??????.'}, status=400)
             target_cafe_id = cafes.pop()
 
-            # 4. ✅ إنشاء المعاملة المالية (Transaction Model)
-            # هذا الإجراء سيقوم بخصم الرصيد تلقائياً لأننا برمجنا ذلك في المودل
-            Transaction.objects.create(
-                wallet=wallet,
-                amount=total_price,
-                transaction_type='WITHDRAWAL',
-                source='APP',
-                description='طلب تطبيق'
-            )
+            if payment_method == 'WALLET':
+                try:
+                    wallet = Wallet.objects.select_for_update().get(user=user)
+                except Wallet.DoesNotExist:
+                    return Response({'error': '??????? ??? ??????.'}, status=404)
 
-            # 5. إنشاء الطلب (Order Model)
+                if wallet.balance < total_price:
+                    return Response({'error': '???? ??????? ??? ????.'}, status=400)
+
+                Transaction.objects.create(
+                    wallet=wallet,
+                    amount=total_price,
+                    transaction_type='WITHDRAWAL',
+                    source='APP',
+                    description='??? ????'
+                )
+
             new_order = Order.objects.create(
                 user=user,
                 cafe_id=target_cafe_id,
                 total_price=total_price,
-                status='PENDING'
+                status='PENDING',
+                payment_method=payment_method
             )
 
-            # 6. إضافة العناصر (Order Items)
             for item in items_data:
                 product_id = item.get('product_id')
                 qty = item.get('quantity', item.get('qty', 1))
-                # البحث عن المنتج في القائمة التي جلبناها سابقاً لتقليل الاستعلامات
                 product = next((p for p in products if str(p.id) == str(product_id)), None)
-                
+
+                if not product:
+                    return Response({'error': '???? ??? ?????.'}, status=400)
+
                 OrderItem.objects.create(
                     order=new_order,
                     product=product,
@@ -153,22 +158,16 @@ def create_order(request):
                     price=product.price
                 )
 
-        # إرسال الإشعار (خارج الترانزكشن لتسريع الاستجابة)
         try:
-            send_real_notification(user, "تم استلام طلبك", f"طلبك #{new_order.order_number} قيد المعالجة.")
-        except:
+            send_real_notification(user, "?? ?????? ????", f"???? #{new_order.order_number} ??? ????????.")
+        except Exception:
             pass
 
-        return Response({'message': 'تم إنشاء الطلب بنجاح', 'order_id': new_order.id}, status=201)
+        return Response({'message': '?? ????? ????? ?????', 'order_id': new_order.id}, status=201)
 
-    except Wallet.DoesNotExist:
-        return Response({'error': 'المحفظة غير موجودة، يرجى التواصل مع الدعم'}, status=404)
-    except ValueError as e:
-        return Response({'error': str(e)}, status=400)
     except Exception as e:
         print(f"Order Error: {e}")
-        return Response({'error': 'حدث خطأ غير متوقع'}, status=500)
-
+        return Response({'error': '??? ??? ????? ????? ?????.'}, status=500)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

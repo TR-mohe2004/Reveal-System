@@ -37,6 +37,7 @@ urlpatterns = [
     # --- إدارة الطلبات ---
     path('orders/', views.orders, name='orders'),
     path('orders/accept/<int:order_id>/', views.accept_order, name='accept_order'),
+    path('orders/preparing/<int:order_id>/', views.preparing_order, name='preparing_order'),
     path('orders/ready/<int:order_id>/', views.ready_order, name='ready_order'),
     path('orders/complete/<int:order_id>/', views.complete_order, name='complete_order'),
 

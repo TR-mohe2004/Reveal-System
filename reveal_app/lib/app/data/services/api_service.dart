@@ -282,7 +282,7 @@ class ApiService {
     }
   }
 
-  Future<bool> createOrder(double totalPrice, List<Map<String, dynamic>> items, String _collegeId) async {
+  Future<bool> createOrder(double totalPrice, List<Map<String, dynamic>> items, String _collegeId, {String paymentMethod = 'WALLET'}) async {
     final url = Uri.parse('$baseUrl/api/orders/');
 
     try {
@@ -292,6 +292,7 @@ class ApiService {
         body: json.encode({
           'total_price': totalPrice,
           'items': items,
+          'payment_method': paymentMethod,
         }),
       );
       final data = _decodeBody(response);
