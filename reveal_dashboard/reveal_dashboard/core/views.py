@@ -23,7 +23,7 @@ from users.models import User
 from wallet.models import Wallet, Transaction
 from .forms import ProductForm
 from .serializers import ProductSerializer, OrderSerializer, UserSerializer, CafeSerializer
-from .utils import normalize_libyan_phone, send_real_notification, get_smart_image_for_product
+from .utils import normalize_libyan_phone, send_real_notification
 
 DEFAULT_CATEGORY_NAMES = ['Food', 'Drinks', 'Snacks']
 
@@ -561,10 +561,6 @@ def add_product(request):
                 if not product.category:
                      product.category = categories_qs.first()
 
-                # Smart Image Logic
-                if not product.image:
-                    product.image = get_smart_image_for_product(product.name)
-
                 product.save()
                 messages.success(request, f"✅ Product {product.name} added!")
                 return redirect('core:products')
@@ -594,9 +590,6 @@ def edit_product(request, product_id):
                 updated_product = form.save(commit=False)
                 updated_product.cafe = my_cafe # Ensure ownership
                 
-                if not updated_product.image and not updated_product.image_url:
-                       updated_product.image = get_smart_image_for_product(updated_product.name)
-                      
                 updated_product.save()
                 messages.success(request, "✅ تم التعديل بنجاح")
                 return redirect('core:products')
