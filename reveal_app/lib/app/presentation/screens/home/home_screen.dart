@@ -1,9 +1,8 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/models/college_model.dart';
 import 'package:reveal_app/app/data/models/product_model.dart'; // ضروري للسلة
+import 'package:reveal_app/app/data/providers/college_provider.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
 import 'package:reveal_app/app/data/providers/cart_provider.dart'; // تأكد من وجود هذا الملف
 
@@ -15,12 +14,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;
   List<ProductModel> allProducts = [];
   List<ProductModel> displayedProducts = [];
   List<CollegeModel> cafes = [];
   String? selectedCafeId;
+  CollegeProvider? _collegeProvider;
 
   final List<Map<String, String>> _categoryTiles = [
     {'key': 'burger', 'label': 'برغر', 'asset': 'assets/images/burger.png'},
@@ -74,7 +74,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _selectedCategory = "all";
 
   final ApiService _apiService = ApiService();
-  late final AnimationController _auroraController;
 
   String _normalizeCafeName(String name) {
     final trimmed = name.trim();
@@ -102,22 +101,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _auroraController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 12),
-    )..repeat();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _collegeProvider = context.read<CollegeProvider>();
+      _collegeProvider?.addListener(_handleCollegeSelection);
+    });
     _fetchRealData();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _auroraController.dispose();
+    _collegeProvider?.removeListener(_handleCollegeSelection);
     super.dispose();
   }
 
   // دالة جلب البيانات الحقيقية (المستخدم + المنتجات)
-    Future<void> _fetchRealData() async {
+  Future<void> _fetchRealData() async {
     try {
       try {
         final userProfile = await _apiService.getUserProfile();
@@ -131,16 +130,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final cafesData = await _apiService.getCafes();
       final filtered = cafesData.where((cafe) => _isSupportedCafeName(cafe.name)).toList();
       if (mounted) {
+        final provider = context.read<CollegeProvider>();
         setState(() {
           cafes = filtered.isNotEmpty ? filtered : cafesData;
-          if (selectedCafeId == null && cafes.isNotEmpty) {
-            selectedCafeId = cafes.first.id;
-            location = _normalizeCafeName(cafes.first.name);
+          if (cafes.isNotEmpty) {
+            final preferredCafe = provider.selectedCollege ?? cafes.first;
+            selectedCafeId = preferredCafe.id;
+            location = _normalizeCafeName(preferredCafe.name);
+            if (provider.selectedCollege == null) {
+              provider.selectCollege(preferredCafe);
+            }
           }
         });
       }
 
-      await _fetchProductsForCafe(selectedCafeId);
+      if (selectedCafeId != null) {
+        await _fetchProductsForCafe(selectedCafeId);
+      } else if (mounted) {
+        setState(() => isLoading = false);
+      }
     } catch (e) {
       debugPrint("Error: $e");
       if (mounted) setState(() => isLoading = false);
@@ -167,7 +175,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-    void _selectCafe(CollegeModel cafe) {
+  void _handleCollegeSelection() {
+    final selected = _collegeProvider?.selectedCollege;
+    if (selected == null || selectedCafeId == selected.id) {
+      return;
+    }
+    _selectCafe(selected);
+  }
+
+  void _selectCafe(CollegeModel cafe) {
     if (selectedCafeId == cafe.id) return;
     setState(() {
       selectedCafeId = cafe.id;
@@ -207,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return allProducts.where((p) => _categoryKeyFor(p) == key).take(5).toList();
   }
 
-void _runSearch(String keyword) {
+  void _runSearch(String keyword) {
     setState(() {
       displayedProducts = allProducts.where((p) =>
         p.name.toLowerCase().contains(keyword.toLowerCase()) || 
@@ -306,20 +322,11 @@ void _runSearch(String keyword) {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text("المطاعم", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        leading: Icon(Icons.favorite, color: orangeColor), // مجرد أيقونة هنا
-),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: tealColor))
-          : Stack(
-              children: [
-                SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 140),
-                  child: Column(
+          : SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 120),
+              child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                   // 1. الترحيب (الاسم الحقيقي)
@@ -368,11 +375,6 @@ void _runSearch(String keyword) {
                   ),
 
                   const SizedBox(height: 20),
-
-                  if (cafes.isNotEmpty) ...[
-                    _buildCafeSelector(),
-                    const SizedBox(height: 16),
-                  ],
 
                   _buildCategoryTiles(),
                   const SizedBox(height: 20),
@@ -432,69 +434,11 @@ void _runSearch(String keyword) {
                   ],
                 ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: IgnorePointer(
-                  child: AnimatedBuilder(
-                    animation: _auroraController,
-                    builder: (context, _) {
-                      final t = _auroraController.value * math.pi * 2;
-                      final drift = math.sin(t) * 10;
-                      final shift = math.cos(t) * 0.3;
-                      return Transform.translate(
-                        offset: Offset(0, drift),
-                        child: Container(
-                          height: 140,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment(-0.6 + shift, -1),
-                              end: Alignment(0.6 - shift, 1),
-                              colors: [
-                                Colors.transparent,
-                                const Color(0xFFB2F5EA).withOpacity(0.22),
-                                const Color(0xFF80DEEA).withOpacity(0.3),
-                                const Color(0xFF4DD0E1).withOpacity(0.36),
-                              ],
-                              stops: const [0.0, 0.45, 0.75, 1.0],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              ],
             ),
     );
   }
 
   // --- Widgets ---
-
-  Widget _buildCafeSelector() {
-    return SizedBox(
-      height: 46,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: cafes.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cafe = cafes[index];
-          final isSelected = cafe.id == selectedCafeId;
-          return ChoiceChip(
-            label: Text(_normalizeCafeName(cafe.name)),
-            selected: isSelected,
-            selectedColor: tealColor,
-            labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
-            onSelected: (_) => _selectCafe(cafe),
-          );
-        },
-      ),
-    );
-  }
 
   Widget _buildCategoryTiles() {
     final tiles = [

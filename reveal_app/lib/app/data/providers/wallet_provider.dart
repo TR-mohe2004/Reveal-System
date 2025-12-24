@@ -132,4 +132,48 @@ class WalletProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> withdrawFromWallet({
+    required double amount,
+    String? note,
+  }) async {
+    _state = ViewState.busy;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final success = await _apiService.withdrawWallet(
+        amount: amount,
+        note: note,
+      );
+
+      if (success) {
+        _wallet = await _apiService.getWallet();
+        _state = ViewState.retrieved;
+        notifyListeners();
+        return true;
+      }
+
+      _state = ViewState.error;
+      _errorMessage = 'فشل الدفع.';
+      notifyListeners();
+      return false;
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        await _apiService.removeToken();
+        _wallet = null;
+        _errorMessage = 'Session expired. Please log in again.';
+      } else {
+        _errorMessage = e.message;
+      }
+      _state = ViewState.error;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'فشل الدفع: $e';
+      _state = ViewState.error;
+      notifyListeners();
+      return false;
+    }
+  }
 }

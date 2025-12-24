@@ -18,26 +18,6 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-      appBar: AppBar(
-        title: const Text(
-          'سلة المشتريات',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
-        actions: [
-          Consumer<CartProvider>(
-            builder: (_, cart, __) => cart.items.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.delete_sweep_outlined, color: Colors.red),
-                    onPressed: () => _showClearCartDialog(context, cart),
-                  )
-                : const SizedBox.shrink(),
-          )
-        ],
-      ),
       body: Consumer<CartProvider>(
         builder: (context, cart, child) {
           if (cart.items.isEmpty) {
@@ -62,6 +42,14 @@ class _CartScreenState extends State<CartScreen> {
 
           return Column(
             children: [
+              if (cart.items.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.delete_sweep_outlined, color: Colors.red),
+                    onPressed: () => _showClearCartDialog(context, cart),
+                  ),
+                ),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

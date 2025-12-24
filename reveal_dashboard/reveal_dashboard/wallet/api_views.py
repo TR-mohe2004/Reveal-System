@@ -206,3 +206,43 @@ def topup_wallet(request):
         return Response({'success': True, 'balance': wallet.balance})
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def withdraw_wallet(request):
+    try:
+        user = get_request_user(request)
+    except Exception as e:
+        return Response({'error': str(e)}, status=401)
+
+    amount_raw = request.data.get('amount')
+    note = (request.data.get('note') or request.data.get('description') or '').strip()
+
+    try:
+        amount = Decimal(str(amount_raw))
+    except Exception:
+        return Response({'error': 'Invalid amount'}, status=400)
+
+    if amount <= 0:
+        return Response({'error': 'Amount must be positive'}, status=400)
+
+    try:
+        wallet, _ = Wallet.objects.get_or_create(user=user)
+        description = 'دفع للمقهى'
+        if note:
+            description = f"{description} - {note}"
+
+        Transaction.objects.create(
+            wallet=wallet,
+            amount=amount,
+            transaction_type='WITHDRAWAL',
+            source='APP',
+            description=description,
+        )
+        wallet.refresh_from_db()
+        return Response({'success': True, 'balance': wallet.balance})
+    except ValueError as e:
+        return Response({'error': str(e)}, status=400)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

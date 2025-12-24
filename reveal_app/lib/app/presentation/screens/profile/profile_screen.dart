@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/providers/profile_image_provider.dart'; // مكتبة اختيار الصور
 import 'package:reveal_app/app/data/models/user_model.dart';
@@ -129,9 +130,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final persistedPath = context.watch<ProfileImageProvider>().localPath;
     final localPath = _localImage?.path ?? persistedPath;
-    final ImageProvider<Object> profileImage = (localPath != null && File(localPath).existsSync())
-        ? FileImage(File(localPath)) as ImageProvider<Object>
-        : NetworkImage(userProfile!.profileImage ?? defaultImage) as ImageProvider<Object>;
+    final networkImage = (userProfile?.profileImage ?? '').trim();
+    final ImageProvider<Object> profileImage;
+    if (localPath != null && File(localPath).existsSync()) {
+      profileImage = FileImage(File(localPath)) as ImageProvider<Object>;
+    } else if (networkImage.isNotEmpty) {
+      profileImage = NetworkImage(networkImage) as ImageProvider<Object>;
+    } else {
+      profileImage = NetworkImage(defaultImage) as ImageProvider<Object>;
+    }
+
+    String joinedDate = "--";
+    final rawJoined = userProfile?.dateJoined;
+    if (rawJoined != null && rawJoined.trim().isNotEmpty) {
+      final parsed = DateTime.tryParse(rawJoined);
+      joinedDate = parsed != null ? DateFormat('yyyy-MM-dd').format(parsed) : rawJoined;
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[50], // خلفية فاتحة جداً
@@ -290,7 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             // باقي المعلومات
                             _buildInfoCard("رقم الهاتف", userProfile!.phoneNumber, Icons.phone_android),
                             _buildInfoCard("الكلية", "كلية تقنية المعلومات", Icons.school), // يمكن جلبها من المودل لاحقاً
-                            _buildInfoCard("تاريخ الانضمام", "2023-09-01", Icons.calendar_today),
+                            _buildInfoCard("تاريخ الانضمام", joinedDate, Icons.calendar_today),
                           ],
                         ),
                       ),

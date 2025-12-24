@@ -23,8 +23,7 @@ class _WalletScreenState extends State<WalletScreen> {
     });
   }
 
-  // دالة لمحاكاة عملية الدفع (تخصم محلياً فقط للتجربة)
-  void _handleTransferToCafe(BuildContext context, double currentBalance) {
+  Future<void> _handleTransferToCafe(BuildContext context, double currentBalance) async {
     final TextEditingController amountController = TextEditingController();
     
     showDialog(
@@ -52,15 +51,22 @@ class _WalletScreenState extends State<WalletScreen> {
             child: const Text("إلغاء", style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (amountController.text.isNotEmpty) {
-                double amount = double.tryParse(amountController.text) ?? 0.0;
+                final amount = double.tryParse(amountController.text.trim().replaceAll(',', '.')) ?? 0.0;
                 if (amount > 0 && amount <= currentBalance) {
-                  // تحديث الرصيد محلياً عبر البروفايدر
-                  context.read<WalletProvider>().updateLocalBalance(currentBalance - amount);
+                  final success = await context.read<WalletProvider>().withdrawFromWallet(amount: amount);
+                  if (!context.mounted) {
+                    return;
+                  }
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("تم خصم $amount د.ل بنجاح")),
+                    SnackBar(
+                      content: Text(
+                        success ? "تم خصم $amount د.ل بنجاح" : "تعذر خصم المبلغ",
+                      ),
+                      backgroundColor: success ? null : Colors.red,
+                    ),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -120,7 +126,7 @@ class _WalletScreenState extends State<WalletScreen> {
           color: const Color(0xFF009688),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -128,7 +134,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 
                 // --- بطاقة المحفظة ---
                 Container(
-                  height: 220,
+                  constraints: const BoxConstraints(minHeight: 220),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,

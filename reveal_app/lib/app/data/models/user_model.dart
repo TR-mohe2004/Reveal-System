@@ -5,6 +5,7 @@ class User {
   final String phoneNumber; // ✨ نص إجباري كما طلبت ✨
   final String? secondaryPhone;
   final String? profileImage;
+  final String? dateJoined;
 
   User({
     required this.id,
@@ -13,6 +14,7 @@ class User {
     required this.phoneNumber,
     this.secondaryPhone,
     this.profileImage,
+    this.dateJoined,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,7 @@ class User {
       secondaryPhone: json['secondary_phone'] ?? json['secondary_phone_number'],
       
       profileImage: json['profile_image_url'] ?? json['image'],
+      dateJoined: json['date_joined'] ?? json['joined_at'] ?? json['created_at'],
     );
   }
 

@@ -80,29 +80,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     // نبدأ مباشرة بـ Column أو Container
     return Column(
       children: [
-        // --- عنوان جميل بسيط ---
-        Container(
-          padding: const EdgeInsets.all(20),
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "طلباتي السابقة",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
-              ),
-              Text(
-                "تابع حالة طلباتك أو اطلب مرة أخرى",
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-        ),
-
         // --- قائمة الطلبات ---
         Expanded(
           child: isLoading

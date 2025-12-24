@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:reveal_app/app/data/providers/notification_provider.dart';
 import 'package:reveal_app/app/data/providers/navigation_provider.dart';
 import 'package:reveal_app/app/data/providers/profile_image_provider.dart'; // لجلب الاسم والصورة المحفوظة
+import 'package:reveal_app/app/data/providers/college_provider.dart';
 
 // استدعاء الصفحات
 import 'wallet/wallet_screen.dart';
@@ -56,6 +57,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationProvider>().load();
+      context.read<CollegeProvider>().fetchColleges();
       _startNotificationPolling();
     });
   }
@@ -90,12 +92,49 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     }
   }
 
+  String _normalizeCafeName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.contains('تقنية')) {
+      return 'مقهى تقنية المعلومات';
+    }
+    if (trimmed.contains('لغة') || trimmed.contains('العربية')) {
+      return 'مقهى اللغة العربية';
+    }
+    if (trimmed.contains('اقتصاد') || trimmed.contains('الاقتصاد')) {
+      return 'مقهى الاقتصاد';
+    }
+    return trimmed;
+  }
+
+  bool _isSupportedCafeName(String name) {
+    final trimmed = name.trim();
+    return trimmed.contains('تقنية') ||
+        trimmed.contains('لغة') ||
+        trimmed.contains('العربية') ||
+        trimmed.contains('اقتصاد') ||
+        trimmed.contains('الاقتصاد');
+  }
+
+  IconData _collegeIcon(String name) {
+    final trimmed = name.trim();
+    if (trimmed.contains('لغة') || trimmed.contains('العربية')) {
+      return Icons.book;
+    }
+    if (trimmed.contains('تقنية')) {
+      return Icons.computer;
+    }
+    if (trimmed.contains('اقتصاد') || trimmed.contains('الاقتصاد')) {
+      return Icons.attach_money;
+    }
+    return Icons.store;
+  }
+
   final List<String> _titles = [
     'المحفظة الإلكترونية',
     'سلة المشتريات',
     'الملف الشخصي',
     'طلباتي السابقة',
-    'جامعة زليتن', 
+    'الجامعة الاسمرية',
   ];
 
   // صفحات التطبيق
@@ -335,9 +374,34 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                 ),
                 
                 // الكليات الثلاث الحقيقية
-                _buildCollegeItem("مقهى كلية اللغة العربية", Icons.book),
-                _buildCollegeItem("مقهى كلية تقنية المعلومات", Icons.computer),
-                _buildCollegeItem("مقهى كلية الاقتصاد", Icons.attach_money),
+                Consumer<CollegeProvider>(
+                  builder: (context, collegeProvider, _) {
+                    final cafes = collegeProvider.colleges
+                        .where((cafe) => _isSupportedCafeName(cafe.name))
+                        .toList();
+                    if (cafes.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        child: Text("لا توجد مقاهي متاحة حالياً", style: TextStyle(color: Colors.grey)),
+                      );
+                    }
+                    return Column(
+                      children: cafes.map((cafe) {
+                        final isSelected = collegeProvider.selectedCollege?.id == cafe.id;
+                        return _buildCollegeItem(
+                          title: _normalizeCafeName(cafe.name),
+                          icon: _collegeIcon(cafe.name),
+                          isSelected: isSelected,
+                          onTap: () {
+                            collegeProvider.selectCollege(cafe);
+                            Navigator.pop(context);
+                            _onItemTapped(4);
+                          },
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
 
                 const Divider(thickness: 1, indent: 20, endIndent: 20),
                 
@@ -391,21 +455,30 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   }
 
   // عنصر الكلية (تفاعلي)
-  Widget _buildCollegeItem(String title, IconData icon) {
+  Widget _buildCollegeItem({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+    bool isSelected = false,
+  }) {
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
         child: Icon(icon, size: 20, color: tealColor),
       ),
-      title: Text(title, style: const TextStyle(fontSize: 14)),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? tealColor : Colors.black87,
+        ),
+      ),
       trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-      onTap: () {
-        Navigator.pop(context); // إغلاق القائمة
-        _onItemTapped(4); // الذهاب للرئيسية
-        // هنا مستقبلاً يمكن تمرير "ID الكلية" للفلترة في HomeScreen
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تم اختيار $title")));
-      },
+      selected: isSelected,
+      selectedTileColor: tealColor.withOpacity(0.08),
+      onTap: onTap,
     );
   }
 
