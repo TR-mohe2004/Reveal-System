@@ -327,8 +327,8 @@ class _HomeScreenState extends State<HomeScreen> {
           : SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 120),
               child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   // 1. الترحيب (الاسم الحقيقي)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -430,9 +430,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
 
-                    const SizedBox(height: 20),
-                  ],
-                ),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
     );
