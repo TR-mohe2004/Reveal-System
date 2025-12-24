@@ -2,7 +2,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from decimal import Decimal
+import re
 from django.db import transaction
+from django.db.models import Q
 from django.core.cache import cache
 from django.conf import settings
 
@@ -10,7 +12,8 @@ from django.conf import settings
 from .models import Product, Order, OrderItem, Cafe
 from wallet.models import Wallet, Transaction
 from .serializers import ProductSerializer, OrderSerializer, CafeSerializer, UserSerializer
-from .utils import send_real_notification
+from users.models import User
+from .utils import send_real_notification, normalize_libyan_phone
 
 # ❌ تم حذف استدعاء payment_service_OLD لأنه يسبب تضارباً
 # ❌ تم حذف firebase_admin لأننا نعتمد على توكن جانغو
@@ -71,6 +74,32 @@ def get_products(request):
     return Response(serializer.data)
 
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_secondary_phone(request):
+    raw_phone = (request.data.get('secondary_phone') or request.data.get('secondary_phone_number') or '').strip()
+
+    if raw_phone == '':
+        request.user.secondary_phone_number = None
+        request.user.save(update_fields=['secondary_phone_number'])
+        return Response({'secondary_phone': None})
+
+    phone = normalize_libyan_phone(raw_phone)
+    if not phone or not re.fullmatch(r'09\d{8}', phone):
+        return Response({'error': '??? ?????? ??? ????.'}, status=400)
+
+    exists = User.objects.filter(
+        Q(phone_number=phone) | Q(secondary_phone_number=phone)
+    ).exclude(id=request.user.id).exists()
+    if exists:
+        return Response({'error': '??? ?????? ?????? ?? ???.'}, status=400)
+
+    request.user.secondary_phone_number = phone
+    request.user.save(update_fields=['secondary_phone_number'])
+    return Response({'secondary_phone': phone})
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):
@@ -87,12 +116,7 @@ def create_order(request):
     user = request.user
     total_price_raw = request.data.get('total_price')
     items_data = request.data.get('items')
-    payment_method = request.data.get('payment_method', 'WALLET')
-
-    if isinstance(payment_method, str):
-        payment_method = payment_method.strip().upper()
-    if payment_method not in ['WALLET', 'CASH']:
-        payment_method = 'WALLET'
+    payment_method = 'WALLET'
 
     if total_price_raw is None or not items_data:
         return Response({'error': '???? ????? ????? ?????????.'}, status=400)
@@ -151,11 +175,13 @@ def create_order(request):
                 if not product:
                     return Response({'error': '???? ??? ?????.'}, status=400)
 
+                options = item.get('options') or item.get('note') or ''
                 OrderItem.objects.create(
                     order=new_order,
                     product=product,
                     quantity=qty,
-                    price=product.price
+                    price=product.price,
+                    options=options
                 )
 
         try:

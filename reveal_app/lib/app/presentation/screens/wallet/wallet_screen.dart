@@ -2,6 +2,8 @@
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/core/enums/view_state.dart';
 import 'package:reveal_app/app/data/providers/wallet_provider.dart';
+import 'wallet_history_screen.dart';
+import 'wallet_transfer_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -176,6 +178,8 @@ class _WalletScreenState extends State<WalletScreen> {
                                       Text(
                                         wallet.college, // الكلية من السيرفر
                                         style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
@@ -247,8 +251,10 @@ class _WalletScreenState extends State<WalletScreen> {
                 const SizedBox(height: 40),
 
                 // --- الأزرار ---
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 16,
+                  runSpacing: 12,
                   children: [
                     _buildActionButton(
                       icon: Icons.payment,
@@ -256,10 +262,23 @@ class _WalletScreenState extends State<WalletScreen> {
                       onTap: () => _handleTransferToCafe(context, wallet.balance),
                     ),
                     _buildActionButton(
+                      icon: Icons.swap_horiz,
+                      label: "تحويل",
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const WalletTransferScreen()),
+                        );
+                      },
+                    ),
+                    _buildActionButton(
                       icon: Icons.history,
                       label: "السجل",
                       onTap: () {
-                         // الانتقال لصفحة السجل (لاحقاً)
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const WalletHistoryScreen()),
+                        );
                       },
                     ),
                     _buildActionButton(

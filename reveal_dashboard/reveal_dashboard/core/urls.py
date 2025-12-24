@@ -25,6 +25,7 @@ urlpatterns = [
     # --- الصفحات الرئيسية (Authentication & Dashboard) ---
     path('', views.custom_login, name='login'),
     path('logout/', views.custom_logout, name='logout'),
+    path('switch-cafe/<int:cafe_id>/', views.switch_cafe, name='switch_cafe'),
     path('dashboard/', views.dashboard, name='dashboard'),
 
     # --- إدارة المنتجات والمخزون ---

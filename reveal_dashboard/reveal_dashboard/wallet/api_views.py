@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import Q
 from firebase_admin import auth as fb_auth
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -74,6 +75,77 @@ def get_wallet(request):
     data['transactions'] = TransactionSerializer(recent_transactions, many=True).data
     
     return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def transfer_wallet(request):
+    try:
+        user = get_request_user(request)
+    except Exception as e:
+        return Response({'error': str(e)}, status=401)
+
+    wallet_code = (request.data.get('wallet_code')
+                   or request.data.get('link_code')
+                   or request.data.get('wallet_id')
+                   or '')
+    amount_raw = request.data.get('amount')
+    note = (request.data.get('note') or request.data.get('description') or '').strip()
+
+    if not wallet_code:
+        return Response({'error': 'يجب إدخال رقم المحفظة.'}, status=400)
+
+    try:
+        amount = Decimal(str(amount_raw))
+    except Exception:
+        return Response({'error': 'قيمة غير صحيحة.'}, status=400)
+
+    if amount <= 0:
+        return Response({'error': 'يجب أن تكون القيمة أكبر من صفر.'}, status=400)
+
+    try:
+        sender_wallet = Wallet.objects.get(user=user)
+
+        target_wallet = Wallet.objects.filter(link_code__iexact=wallet_code).first()
+        if not target_wallet and str(wallet_code).isdigit():
+            target_wallet = Wallet.objects.filter(id=int(wallet_code)).first()
+
+        if not target_wallet:
+            return Response({'error': 'المحفظة المستلمة غير موجودة.'}, status=404)
+
+        if sender_wallet.id == target_wallet.id:
+            return Response({'error': 'لا يمكن التحويل إلى نفس المحفظة.'}, status=400)
+
+        with transaction.atomic():
+            sender_desc = f"تحويل إلى {target_wallet.user.full_name}"
+            receiver_desc = f"تحويل من {user.full_name}"
+            if note:
+                sender_desc = f"{sender_desc} - {note}"
+                receiver_desc = f"{receiver_desc} - {note}"
+
+            Transaction.objects.create(
+                wallet=sender_wallet,
+                amount=amount,
+                transaction_type='WITHDRAWAL',
+                source='APP',
+                description=sender_desc,
+            )
+            Transaction.objects.create(
+                wallet=target_wallet,
+                amount=amount,
+                transaction_type='DEPOSIT',
+                source='APP',
+                description=receiver_desc,
+            )
+
+        sender_wallet.refresh_from_db()
+        return Response({'success': True, 'balance': sender_wallet.balance})
+    except Wallet.DoesNotExist:
+        return Response({'error': 'المحفظة غير موجودة.'}, status=404)
+    except ValueError as e:
+        return Response({'error': str(e)}, status=400)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
 
 @api_view(['POST'])

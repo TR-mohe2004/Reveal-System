@@ -1,46 +1,51 @@
 class CartItem {
-  final String id;          // معرف المنتج
-  final String name;        // اسم المنتج
-  final int quantity;       // الكمية
-  final double price;       // السعر الفردي
-  final String imageUrl;    // الصورة
-  final String collegeId;   // معرف الكلية
-  final String collegeName; // اسم الكلية
+  final String id;
+  final String productId;
+  final String name;
+  final int quantity;
+  final double price;
+  final String imageUrl;
+  final String collegeId;
+  final String collegeName;
+  final String options;
 
   CartItem({
     required this.id,
+    required this.productId,
     required this.name,
     required this.quantity,
     required this.price,
     required this.imageUrl,
     required this.collegeId,
     required this.collegeName,
+    this.options = '',
   });
 
-  // دالة لحساب السعر الإجمالي لهذا العنصر (السعر * الكمية)
   double get totalItemPrice => price * quantity;
 
-  // تحويل من JSON (عند استرجاع السلة المحفوظة)
   factory CartItem.fromJson(Map<String, dynamic> json) {
+    final productId = json['product_id']?.toString() ?? json['id']?.toString() ?? '';
     return CartItem(
-      id: json['product_id']?.toString() ?? json['id'].toString(),
+      id: json['cart_id']?.toString() ?? productId,
+      productId: productId,
       name: json['product_name'] ?? json['name'] ?? '',
       quantity: int.tryParse(json['quantity'].toString()) ?? 1,
       price: double.tryParse(json['price'].toString()) ?? 0.0,
       imageUrl: json['image_url'] ?? json['image'] ?? '',
       collegeId: json['college_id']?.toString() ?? '',
       collegeName: json['college_name'] ?? '',
+      options: json['options']?.toString() ?? '',
     );
   }
 
-  // تحويل إلى JSON (لإرسال الطلب للباك إند)
   Map<String, dynamic> toJson() {
     return {
-      'product_id': id,
-      'qty': quantity, // الباك إند عادة يتوقع qty أو quantity
+      'product_id': productId,
+      'qty': quantity,
       'quantity': quantity,
       'price': price,
       'college_id': collegeId,
+      'options': options,
     };
   }
 }

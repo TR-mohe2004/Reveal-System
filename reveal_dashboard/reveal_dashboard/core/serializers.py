@@ -2,11 +2,8 @@ from rest_framework import serializers
 from .models import Cafe, Product, Order, OrderItem, Category
 from users.models import User
 
-# --- دالة مساعدة لبناء روابط الصور ---
+
 def _build_image_url(image_value, request=None):
-    """
-    تقوم بتحويل مسار الصورة المخزن إلى رابط كامل (Absolute URL).
-    """
     if not image_value:
         return None
 
@@ -20,21 +17,19 @@ def _build_image_url(image_value, request=None):
     return f"/media/{image_str}" if not image_str.startswith('/media/') else image_str
 
 
-# --- 1. تسلسل المستخدم (User Serializer) ---
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'full_name', 'phone_number']
+        fields = ['id', 'email', 'full_name', 'phone_number', 'secondary_phone_number', 'profile_image_url']
 
 
-# --- 2. تسلسل البيانات الأساسية (Cafe, Category, Product) ---
 class CafeSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Cafe
         fields = ['id', 'name', 'image', 'location', 'is_active']
-        
+
     def get_image(self, obj):
         request = self.context.get('request')
         return _build_image_url(obj.image, request)
@@ -43,7 +38,6 @@ class CafeSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        # أضفت icon هنا احتياطاً لو كان موجوداً في المودل، لو غير موجود احذفه من هنا
         fields = ['id', 'name']
 
 
@@ -56,11 +50,12 @@ class ProductSerializer(serializers.ModelSerializer):
     cafe_id = serializers.IntegerField(read_only=True)
     image = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    image_variant = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'price', 'image', 'image_url', 'description',
+            'id', 'name', 'price', 'image', 'image_url', 'image_variant', 'description',
             'rating', 'rating_count',
             'category', 'category_name', 'category_id',
             'cafe', 'cafe_name', 'cafe_id',
@@ -75,8 +70,34 @@ class ProductSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return _build_image_url(obj.image, request)
 
+    def get_image_variant(self, obj):
+        category_name = ''
+        if getattr(obj, 'category', None) and obj.category:
+            category_name = (obj.category.name or '')
 
-# --- 3. تسلسل الطلبات (Order Serializers) ---
+        text = f"{category_name} {obj.name or ''}".lower()
+
+        def has_any(values):
+            return any(value in text for value in values)
+
+        if has_any(['pizza', 'بيتزا']):
+            count = 5
+        elif has_any(['burger', 'برغر', 'برجر']):
+            count = 5
+        elif has_any(['dessert', 'sweet', 'حلويات', 'حلوى', 'حلى']):
+            count = 5
+        elif has_any(['coffee', 'قهوة']):
+            count = 2
+        elif has_any(['drink', 'drinks', 'juice', 'water', 'مشروب', 'مشروبات', 'عصير', 'ماء', 'مياه']):
+            count = 5
+        else:
+            count = 5
+
+        if not obj.id:
+            return 0
+        return int(obj.id) % count
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), source='product')
     product_name = serializers.ReadOnlyField(source='product.name')
@@ -85,7 +106,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ['product_id', 'product_name', 'product_price', 'product_image', 'quantity']
+        fields = ['product_id', 'product_name', 'product_price', 'product_image', 'quantity', 'options']
 
     def get_product_image(self, obj):
         request = self.context.get('request')
@@ -100,4 +121,8 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'order_number', 'total_price', 'status', 'status_display', 'payment_method', 'payment_method_display', 'created_at', 'cafe_name', 'items']
+        fields = [
+            'id', 'order_number', 'total_price', 'status', 'status_display',
+            'payment_method', 'payment_method_display', 'created_at',
+            'cafe_name', 'items'
+        ]

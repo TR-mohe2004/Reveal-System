@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.urls import reverse
 from django.contrib import messages
 from django.conf import settings
 from django.db import transaction
@@ -24,6 +25,7 @@ from wallet.models import Wallet, Transaction
 from .forms import ProductForm
 from .serializers import ProductSerializer, OrderSerializer, UserSerializer, CafeSerializer
 from .utils import normalize_libyan_phone, send_real_notification
+from .api_views import invalidate_products_cache
 
 DEFAULT_CATEGORY_NAMES = ['Food', 'Drinks', 'Snacks']
 
@@ -76,7 +78,7 @@ def api_login(request):
     
     user_obj = None
     if phone:
-        user_obj = User.objects.filter(phone_number=phone).first()
+        user_obj = User.objects.filter(Q(phone_number=phone) | Q(secondary_phone_number=phone)).first()
     
     # إذا لم يوجد بالهاتف، نجرب كبريد إلكتروني
     if not user_obj and '@' in str(raw_identifier):
@@ -212,12 +214,7 @@ def create_order(request):
     user = request.user
     total_price_raw = request.data.get('total_price')
     items_data = request.data.get('items')
-    payment_method = request.data.get('payment_method', 'WALLET')
-
-    if isinstance(payment_method, str):
-        payment_method = payment_method.strip().upper()
-    if payment_method not in ['WALLET', 'CASH']:
-        payment_method = 'WALLET'
+    payment_method = 'WALLET'
 
     if total_price_raw is None or not items_data:
         return Response({'error': '???? ????? ????? ?????????.'}, status=400)
@@ -276,11 +273,13 @@ def create_order(request):
                 if not product:
                     return Response({'error': '???? ??? ?????.'}, status=400)
 
+                options = item.get('options') or item.get('note') or ''
                 OrderItem.objects.create(
                     order=new_order,
                     product=product,
                     quantity=qty,
-                    price=product.price
+                    price=product.price,
+                    options=options
                 )
 
         try:
@@ -318,6 +317,8 @@ def custom_login(request):
     if request.user.is_authenticated:
         return redirect('core:dashboard')
 
+    prefill_username = request.GET.get('phone') or request.GET.get('username') or ''
+
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
@@ -326,7 +327,7 @@ def custom_login(request):
             username = username.replace('-', '').replace(' ', '')
 
         phone = normalize_libyan_phone(username)
-        user_obj = User.objects.filter(phone_number=phone).first()
+        user_obj = User.objects.filter(Q(phone_number=phone) | Q(secondary_phone_number=phone)).first()
         # Fallback to checking email if phone fails
         if not user_obj:
              user_obj = User.objects.filter(email__iexact=username).first()
@@ -339,39 +340,48 @@ def custom_login(request):
             login(request, user)
             return redirect('core:dashboard')
         else:
-            return render(request, 'login.html', {'error': 'بيانات الدخول غير صحيحة'})
+            return render(request, 'login.html', {
+                'error': 'بيانات الدخول غير صحيحة',
+                'prefill_username': username or prefill_username,
+            })
 
-    return render(request, 'login.html')
+    return render(request, 'login.html', {'prefill_username': prefill_username})
 
 
 def custom_logout(request):
     logout(request)
+    next_url = request.GET.get('next')
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect('core:login')
+
+
+def switch_cafe(request, cafe_id):
+    logout(request)
+    cafe = Cafe.objects.filter(id=cafe_id, owner__isnull=False).select_related('owner').first()
+    if cafe and cafe.owner and cafe.owner.phone_number:
+        return redirect(f"{reverse('core:login')}?phone={cafe.owner.phone_number}")
     return redirect('core:login')
 
 
 @login_required(login_url='core:login')
 def dashboard(request):
-    """
-    لوحة التحكم الرئيسية: تعرض الإحصائيات + المنتجات المتاحة (لحل مشكلة اختفاء الصناديق)
-    """
+    # ???? ?????? ????????: ???? ?????????? + ???????? ???????
     cafe = get_cafe_for_user(request.user)
-    
+
     products_count = 0
     orders_count = 0
-    # ✅ قائمة المنتجات لعرضها في الصناديق
-    products_list = [] 
-    
+    products_list = []
+
     if cafe:
         products_count = Product.objects.filter(cafe=cafe).count()
         orders_count = Order.objects.filter(cafe=cafe).count()
         wallets_count = Wallet.objects.count()
-        # جلب المنتجات للمقهى الحالي
         products_list = Product.objects.filter(cafe=cafe, is_available=True).order_by('-created_at')[:20]
     else:
         wallets_count = Wallet.objects.count()
-        # إذا كان سوبر يوزر، قد يرغب برؤية منتجات عامة أو فارغة
         if request.user.is_superuser:
-             products_list = Product.objects.filter(is_available=True).order_by('-created_at')[:20]
+            products_list = Product.objects.filter(is_available=True).order_by('-created_at')[:20]
 
     context = {
         'total_products': products_count,
@@ -379,8 +389,8 @@ def dashboard(request):
         'total_cafes': Cafe.objects.count() if request.user.is_superuser else (1 if cafe else 0),
         'total_wallets': wallets_count,
         'user': request.user,
-        'cafe_name': cafe.name if cafe else "لوحة الإدارة العامة",
-        'products': products_list, # ✅ تم تمرير المنتجات هنا ليراها ملف dashboard.html
+        'cafe_name': cafe.name if cafe else "???? ??????? ??????",
+        'products': products_list,
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -388,10 +398,10 @@ def dashboard(request):
 @login_required(login_url='core:login')
 def products(request):
     cafe = get_cafe_for_user(request.user)
-    
+
     if not cafe:
         return render(request, 'core/products.html', {
-            'products': [], 'categories': [], 'cafe_name': "لا يوجد مقهى محدد"
+            'products': [], 'categories': [], 'cafe_name': "?? ???? ???? ????"
         })
 
     categories = ensure_categories_for_cafe(cafe)
@@ -407,16 +417,24 @@ def products(request):
 @login_required(login_url='core:login')
 def orders(request):
     cafe = get_cafe_for_user(request.user)
-    
+
     if request.user.is_superuser:
         all_orders = Order.objects.all().order_by('-created_at')
     elif not cafe:
-        return render(request, 'core/orders.html', {'orders': [], 'new_orders': [], 'preparing_orders': [], 'ready_orders': []})
+        return render(request, 'core/orders.html', {
+            'orders': [],
+            'new_orders': [],
+            'accepted_orders': [],
+            'preparing_orders': [],
+            'ready_orders': [],
+        })
     else:
         all_orders = Order.objects.filter(cafe=cafe).order_by('-created_at')
+
     context = {
         'orders': all_orders,
         'new_orders': all_orders.filter(status='PENDING'),
+        'accepted_orders': all_orders.filter(status='ACCEPTED'),
         'preparing_orders': all_orders.filter(status='PREPARING'),
         'ready_orders': all_orders.filter(status='READY'),
     }
@@ -562,6 +580,7 @@ def add_product(request):
                      product.category = categories_qs.first()
 
                 product.save()
+                invalidate_products_cache()
                 messages.success(request, f"✅ Product {product.name} added!")
                 return redirect('core:products')
             except Exception as e:
@@ -591,6 +610,7 @@ def edit_product(request, product_id):
                 updated_product.cafe = my_cafe # Ensure ownership
                 
                 updated_product.save()
+                invalidate_products_cache()
                 messages.success(request, "✅ تم التعديل بنجاح")
                 return redirect('core:products')
             except Exception as e:
@@ -604,6 +624,7 @@ def delete_product(request, product_id):
     cafe = get_cafe_for_user(request.user)
     if cafe:
         Product.objects.filter(id=product_id, cafe=cafe).delete()
+        invalidate_products_cache()
         messages.success(request, "تم حذف المنتج.")
     return redirect('core:products')
 
@@ -708,9 +729,8 @@ def accept_order(request, order_id):
         
     order = get_object_or_404(Order, id=order_id, cafe=cafe)
     if order.status == 'PENDING':
-        order.status = 'PREPARING'
+        order.status = 'ACCEPTED'
         order.save(update_fields=['status'])
-        send_real_notification(order.user, "?? ???? ???? ?????", "?? ???? ???? ?????.")
     
     return redirect('core:orders')
 
@@ -722,8 +742,9 @@ def preparing_order(request, order_id):
         return redirect('core:orders')
 
     order = get_object_or_404(Order, id=order_id, cafe=cafe)
-    if order.status == 'PREPARING':
-        send_real_notification(order.user, "???? ??? ???????", "???? ??? ???????.")
+    if order.status == 'ACCEPTED':
+        order.status = 'PREPARING'
+        order.save(update_fields=['status'])
 
     return redirect('core:orders')
 
@@ -738,7 +759,6 @@ def ready_order(request, order_id):
     if order.status == 'PREPARING':
         order.status = 'READY'
         order.save(update_fields=['status'])
-        send_real_notification(order.user, "???? ???? ????????", "???? ???? ????????.")
     
     return redirect('core:orders')
 

@@ -68,6 +68,14 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                                 <li><a class="dropdown-item" href="{% url 'core:settings' %}">الإعدادات</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">تبديل المقهى</h6></li>
+                                {% for cafe in switchable_cafes %}
+                                    <li><a class="dropdown-item" href="{% url 'core:switch_cafe' cafe.id %}">{{ cafe.name }}</a></li>
+                                {% empty %}
+                                    <li><span class="dropdown-item text-muted">لا توجد مقاهٍ</span></li>
+                                {% endfor %}
+                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{% url 'core:logout' %}">تسجيل خروج</a></li>
                             </ul>
                         </li>

@@ -1,3 +1,17 @@
+String _normalizeCollegeName(String name) {
+  final trimmed = name.trim();
+  if (trimmed.contains('تقنية')) {
+    return 'مقهى تقنية المعلومات';
+  }
+  if (trimmed.contains('اللغة العربية') || trimmed.contains('لغة عربية')) {
+    return 'مقهى اللغة العربية';
+  }
+  if (trimmed.contains('الاقتصاد') || trimmed.contains('اقتصاد')) {
+    return 'مقهى الاقتصاد';
+  }
+  return trimmed;
+}
+
 class CollegeModel {
   final String id;
   final String name;
@@ -15,7 +29,7 @@ class CollegeModel {
       id: json['id']?.toString() ?? '0',
       
       // حماية الاسم من أن يكون null، والبحث عن مفاتيح بديلة
-      name: json['name'] ?? json['college_name'] ?? 'كلية غير معروفة',
+      name: _normalizeCollegeName((json['name'] ?? json['college_name'] ?? 'كلية غير معروفة').toString()),
       
       // البحث عن الصورة بعدة مسميات محتملة
       image: json['image'] ?? json['logo'] ?? json['icon_url'],
@@ -25,7 +39,7 @@ class CollegeModel {
   factory CollegeModel.fromFirestore(String id, Map<String, dynamic> data) {
     return CollegeModel(
       id: id,
-      name: data['name'] ?? data['college_name'] ?? '',
+      name: _normalizeCollegeName((data['name'] ?? data['college_name'] ?? '').toString()),
       image: data['image'] ?? data['logo'],
     );
   }

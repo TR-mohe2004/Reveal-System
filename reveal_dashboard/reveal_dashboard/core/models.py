@@ -19,6 +19,7 @@ class Cafe(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+
     def __str__(self):
         return self.name
 
@@ -63,6 +64,7 @@ class Product(models.Model):
 class Order(models.Model):
     STATUS_CHOICES = (
         ('PENDING', 'قيد الانتظار'),
+        ('ACCEPTED', '?? ???? ?????'),
         ('PREPARING', 'قيد التحضير'),
         ('READY', 'جاهز للاستلام'),
         ('COMPLETED', 'مكتمل'),
@@ -96,6 +98,7 @@ class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1, verbose_name="الكمية")
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="سعر الوحدة عند الطلب", default=0.00)
+    options = models.CharField(max_length=100, blank=True, default='', verbose_name='Order options')
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"

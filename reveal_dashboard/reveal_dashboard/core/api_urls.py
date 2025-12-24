@@ -10,6 +10,7 @@ urlpatterns = [
 
     # --- المستخدم (User) ---
     path('user/', api_views.get_user_profile, name='api_user_profile'),
+    path('user/secondary-phone/', api_views.update_secondary_phone, name='api_user_secondary_phone'),
 
     # --- البيانات الأساسية (Cafes & Products) ---
     path('cafes/', api_views.get_cafes_list, name='api_cafes'),

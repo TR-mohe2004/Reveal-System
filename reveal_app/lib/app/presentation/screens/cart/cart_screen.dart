@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/providers/cart_provider.dart';
+import 'package:reveal_app/app/data/providers/navigation_provider.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -68,6 +69,7 @@ class _CartScreenState extends State<CartScreen> {
                   separatorBuilder: (c, i) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = cartItems[index];
+                    final isNetworkImage = item.imageUrl.startsWith('http');
                     return Dismissible(
                       key: ValueKey(item.id),
                       direction: DismissDirection.endToStart,
@@ -100,7 +102,12 @@ class _CartScreenState extends State<CartScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   color: Colors.grey[100],
                                   image: item.imageUrl.isNotEmpty
-                                      ? DecorationImage(image: NetworkImage(item.imageUrl), fit: BoxFit.cover)
+                                      ? DecorationImage(
+                                          image: isNetworkImage
+                                              ? NetworkImage(item.imageUrl)
+                                              : AssetImage(item.imageUrl) as ImageProvider,
+                                          fit: BoxFit.cover,
+                                        )
                                       : null,
                                 ),
                                 child: item.imageUrl.isEmpty ? const Icon(Icons.fastfood, color: Colors.grey) : null,
@@ -111,6 +118,10 @@ class _CartScreenState extends State<CartScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    if (item.options.isNotEmpty)
+                                      Text(item.options, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                    if (item.options.isNotEmpty)
+                                      const SizedBox(height: 4),
                                     const SizedBox(height: 4),
                                     Text('${(item.price * item.quantity).toStringAsFixed(2)} د.ل', style: const TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold, fontSize: 14)),
                                   ],
@@ -164,16 +175,14 @@ class _CartScreenState extends State<CartScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                        '????? ?????',
+                        'طريقة الدفع',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        _buildPaymentOption(value: 'WALLET', label: '???????', icon: Icons.account_balance_wallet),
-                        const SizedBox(width: 12),
-                        _buildPaymentOption(value: 'CASH', label: '???', icon: Icons.payments),
+                        _buildPaymentOption(value: 'WALLET', label: 'المحفظة', icon: Icons.account_balance_wallet),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -245,7 +254,7 @@ class _CartScreenState extends State<CartScreen> {
             title: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 60),
             content: const Text('تم تأكيد الطلب!\nسنبدأ في تحضير طلبك الآن.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
             actions: [
-              TextButton(onPressed: () {Navigator.pop(ctx); Navigator.pop(context);}, child: const Text('حسناً', style: TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold))),
+              TextButton(onPressed: () {Navigator.pop(ctx); context.read<NavigationProvider>().setIndex(4);}, child: const Text('حسناً', style: TextStyle(color: Color(0xFF2DBA9D), fontWeight: FontWeight.bold))),
             ],
           ),
         );

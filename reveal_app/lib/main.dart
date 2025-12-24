@@ -11,6 +11,10 @@ import 'package:reveal_app/app/data/providers/product_provider.dart';
 import 'package:reveal_app/app/data/providers/wallet_provider.dart'; // ✅ مهم جداً
 import 'package:reveal_app/app/data/providers/favorites_provider.dart';
 import 'package:reveal_app/app/data/providers/college_provider.dart';
+import 'package:reveal_app/app/data/providers/notification_provider.dart';
+import 'package:reveal_app/app/data/providers/theme_provider.dart';
+import 'package:reveal_app/app/data/providers/navigation_provider.dart';
+import 'package:reveal_app/app/data/providers/profile_image_provider.dart';
 
 // --- استيراد الشاشات ---
 import 'package:reveal_app/app/presentation/screens/auth/welcome_screen.dart';
@@ -53,8 +57,13 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
         ChangeNotifierProvider(create: (_) => CollegeProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => NavigationProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()..loadTheme()),
+        ChangeNotifierProvider(create: (_) => ProfileImageProvider()..load()),
       ],
-      child: MaterialApp(
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
         title: 'Reveal App',
         debugShowCheckedModeBanner: false,
         
@@ -100,8 +109,49 @@ class MyApp extends StatelessWidget {
           ),
         ),
         
+        darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF2DBA9D),
+            secondary: Color(0xFFF4A259),
+            background: Color(0xFF0F1116),
+            surface: Color(0xFF1B2128),
+          ),
+          scaffoldBackgroundColor: const Color(0xFF0F1116),
+          cardColor: const Color(0xFF1B2128),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF12161C),
+            elevation: 0,
+            centerTitle: true,
+            iconTheme: IconThemeData(color: Colors.white),
+            titleTextStyle: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            backgroundColor: Color(0xFF12161C),
+            selectedItemColor: Color(0xFFF4A259),
+            unselectedItemColor: Colors.white70,
+            showUnselectedLabels: true,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2DBA9D),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme).apply(
+            bodyColor: Colors.white,
+            displayColor: Colors.white,
+          ),
+        ),
+        themeMode: themeProvider.themeMode,
+
         // --- 3. المسارات (Routes) ---
-        initialRoute: '/welcome', // أول صفحة تفتح
+        home: const AuthGate(),
         routes: {
           '/welcome': (context) => const WelcomeScreen(),
           '/login': (context) => const LoginScreen(),
@@ -111,6 +161,28 @@ class MyApp extends StatelessWidget {
           '/link-wallet': (context) => const LinkWalletScreen(),
         },
       ),
+      ),
     );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final status = context.watch<AuthProvider>().status;
+    switch (status) {
+      case AuthStatus.authenticated:
+        return const MainScreen();
+      case AuthStatus.unauthenticated:
+        return const WelcomeScreen();
+      case AuthStatus.authenticating:
+      case AuthStatus.uninitialized:
+      default:
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+    }
   }
 }

@@ -32,6 +32,13 @@ class User(AbstractUser):
     
     # رقم الهاتف موجود لكنه ليس وسيلة الدخول الأساسية
     phone_number = models.CharField(max_length=15, unique=True, verbose_name="رقم الهاتف")
+    secondary_phone_number = models.CharField(
+        max_length=15,
+        unique=True,
+        blank=True,
+        null=True,
+        verbose_name="رقم هاتف إضافي",
+    )
     full_name = models.CharField(max_length=100, verbose_name="الاسم الكامل")
     profile_image_url = models.CharField(max_length=500, blank=True, null=True, verbose_name="رابط الصورة")
     

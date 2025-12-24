@@ -3,6 +3,7 @@ class User {
   final String fullName;
   final String email;       // ✨ نص إجباري كما طلبت ✨
   final String phoneNumber; // ✨ نص إجباري كما طلبت ✨
+  final String? secondaryPhone;
   final String? profileImage;
 
   User({
@@ -10,6 +11,7 @@ class User {
     required this.fullName,
     required this.email,
     required this.phoneNumber,
+    this.secondaryPhone,
     this.profileImage,
   });
 
@@ -23,6 +25,7 @@ class User {
       // قيم افتراضية فارغة كما طلبت لتجنب الـ Null
       email: json['email'] ?? '', 
       phoneNumber: json['phone_number'] ?? json['phone'] ?? '',
+      secondaryPhone: json['secondary_phone'] ?? json['secondary_phone_number'],
       
       profileImage: json['profile_image_url'] ?? json['image'],
     );
@@ -35,6 +38,7 @@ class User {
       'full_name': fullName,
       'email': email,
       'phone_number': phoneNumber,
+      'secondary_phone': secondaryPhone,
     };
   }
 }

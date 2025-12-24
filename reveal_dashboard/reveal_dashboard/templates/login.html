@@ -60,7 +60,7 @@
             {% endif %}
 
             <div class="form-floating mb-3">
-                <input type="text" class="form-control" id="username" name="username" placeholder="09xxxxxxxx" required>
+                <input type="text" class="form-control" id="username" name="username" placeholder="09xxxxxxxx" value="{{ prefill_username|default:'' }}" required>
                 <label for="username">رقم الهاتف</label>
             </div>
 

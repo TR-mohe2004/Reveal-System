@@ -1,3 +1,17 @@
+String _normalizeCafeName(String name) {
+  final trimmed = name.trim();
+  if (trimmed.contains('تقنية')) {
+    return 'مقهى تقنية المعلومات';
+  }
+  if (trimmed.contains('اللغة العربية') || trimmed.contains('لغة عربية')) {
+    return 'مقهى اللغة العربية';
+  }
+  if (trimmed.contains('الاقتصاد') || trimmed.contains('اقتصاد')) {
+    return 'مقهى الاقتصاد';
+  }
+  return trimmed;
+}
+
 class OrderModel {
   final int id;
   final String orderNumber;
@@ -45,13 +59,18 @@ class OrderModel {
     }
   }
 
+  String get displayCafeName {
+    return _normalizeCafeName(cafeName ?? '');
+  }
+
   String get statusText {
     switch (status.toUpperCase()) {
-      case 'PENDING': return 'قيد الانتظار';
-      case 'PREPARING': return 'جاري التحضير';
-      case 'READY': return 'جاهز للاستلام';
+      case 'PENDING': return 'بانتظار الموافقة';
+      case 'ACCEPTED': return 'تم قبول طلبك بنجاح';
+      case 'PREPARING': return 'طلبك قيد التحضير';
+      case 'READY': return 'طلبك جاهز للاستلام';
       case 'COMPLETED': return 'مكتمل';
-      case 'CANCELLED': return 'ملغي';
+      case 'CANCELLED': return 'تم الإلغاء';
       default: return status;
     }
   }
@@ -63,6 +82,7 @@ class OrderItem {
   final int quantity;
   final double price; // مفيدة لو احتجت تعرض سعر القطعة
   final String? productImage;
+  final String options;
 
   OrderItem({
     required this.productId,
@@ -70,6 +90,7 @@ class OrderItem {
     required this.quantity,
     this.price = 0.0,
     this.productImage,
+    this.options = '',
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -79,6 +100,7 @@ class OrderItem {
       quantity: json['quantity'] ?? 1,
       price: double.tryParse(json['price'].toString()) ?? 0.0,
       productImage: json['product_image'] ?? json['image_url'],
+      options: json['options']?.toString() ?? '',
     );
   }
 }

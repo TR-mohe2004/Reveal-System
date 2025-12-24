@@ -1,8 +1,11 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:reveal_app/app/core/utils/smart_image_util.dart'; // استيراد الحيلة الذكية
 import 'package:reveal_app/app/data/models/order_model.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
+import 'package:reveal_app/app/data/providers/notification_provider.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -22,7 +25,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   void initState() {
     super.initState();
+    _initLocale();
     fetchOrders();
+  }
+
+  Future<void> _initLocale() async {
+    try {
+      await initializeDateFormatting('ar');
+    } catch (_) {
+      // ignore locale init errors
+    }
   }
 
   Future<void> fetchOrders() async {
@@ -34,6 +46,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           myOrders = orders;
           isLoading = false;
         });
+        await context.read<NotificationProvider>().refreshFromOrders(orders);
       }
     } catch (e) {
       debugPrint("Error fetching orders: $e");
@@ -47,14 +60,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
       case 'SUCCESS':
       case 'COMPLETED':
       case 'READY':
-        return {"color": tealColor, "text": "جاهز للاستلام ✅", "bg": tealColor.withOpacity(0.1)};
+        return {"color": tealColor, "text": "طلبك جاهز للاستلام", "bg": tealColor.withOpacity(0.1)};
       case 'PREPARING':
-        return {"color": Colors.orange, "text": "قيد التحضير 👨‍🍳", "bg": Colors.orange.withOpacity(0.1)};
+        return {"color": Colors.orange, "text": "طلبك قيد التحضير", "bg": Colors.orange.withOpacity(0.1)};
       case 'CANCELLED':
-        return {"color": Colors.red, "text": "ملغي ❌", "bg": Colors.red.withOpacity(0.1)};
+        return {"color": Colors.red, "text": "تم الإلغاء", "bg": Colors.red.withOpacity(0.1)};
       case 'PENDING':
+        return {"color": Colors.grey, "text": "بانتظار الموافقة", "bg": Colors.grey.withOpacity(0.1)};
+      case 'ACCEPTED':
+        return {"color": Colors.blue, "text": "تم قبول طلبك بنجاح", "bg": Colors.blue.withOpacity(0.1)};
       default:
-        return {"color": Colors.grey, "text": "قيد الانتظار ⏳", "bg": Colors.grey.withOpacity(0.1)};
+        return {"color": Colors.grey, "text": "حالة غير معروفة", "bg": Colors.grey.withOpacity(0.1)};
     }
   }
 
@@ -139,7 +155,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
       orderDate = DateTime.now();
     }
     // تنسيق الوقت ليكون مقروءاً (مثال: منذ 5 دقائق)
-    final dateStr = intl.DateFormat('d MMM, hh:mm a', 'en').format(orderDate);
+    String dateStr;
+    try {
+      dateStr = intl.DateFormat('d MMM, hh:mm a', 'ar').format(orderDate);
+    } catch (_) {
+      dateStr = intl.DateFormat('d MMM, hh:mm a').format(orderDate);
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -177,7 +198,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.cafeName ?? "مقهى الكلية", // ✅ الاسم الحقيقي للمقهى
+                          order.displayCafeName.isNotEmpty ? order.displayCafeName : (order.cafeName ?? "مقهى الكلية"), // ✅ الاسم الحقيقي للمقهى
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Text(
@@ -268,6 +289,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     );
                   },
                 ),
+              ),
+            ),
+
+          if (order.items.any((item) => item.options.isNotEmpty))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: order.items
+                    .where((item) => item.options.isNotEmpty)
+                    .map((item) => Text(
+                          '${item.productName}: ${item.options}',
+                          style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                        ))
+                    .toList(),
               ),
             ),
 

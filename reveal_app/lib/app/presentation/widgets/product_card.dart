@@ -15,30 +15,43 @@ class ProductCard extends StatelessWidget {
 
   bool get _hasRemoteImage {
     final url = product.imageUrl.trim().toLowerCase();
-    return url.isNotEmpty && url != 'null';
+    return url.isNotEmpty && url != 'null' && url.startsWith('http');
   }
 
-  // --- دالة اختيار صورة عشوائية ---
   String _chooseFallbackAsset() {
-    final normalized = product.category.toLowerCase();
-    final pools = <String, List<String>>{
-      'pizza': _assetPool('assets/images/pizza', 5),
-      'بيتزا': _assetPool('assets/images/pizza', 5),
-      'burger': _assetPool('assets/images/burger', 5),
-      'برجر': _assetPool('assets/images/burger', 5),
-      'dessert': _assetPool('assets/images/dessert', 4),
-      'حلو': _assetPool('assets/images/dessert', 4),
-      'drink': _assetPool('assets/images/drinks', 4),
-      'مشروب': _assetPool('assets/images/drinks', 4),
-    };
+    final normalized = '${product.category} ${product.name}'.toLowerCase();
+    final pizzaPool = _assetPool('assets/images/pizza', 5);
+    final burgerPool = _assetPool('assets/images/burger', 5);
+    final dessertPool = _assetPool('assets/images/dessert', 5);
+    final drinkPool = _assetPool('assets/images/drink', 5);
+    final coffeePool = [
+      'assets/images/coffee_placeholder.png',
+      'assets/images/coffee_placeholder2.png',
+    ];
 
-    for (final entry in pools.entries) {
-      if (normalized.contains(entry.key)) {
-        return _pickRandom(entry.value);
-      }
+    if (normalized.contains('قهوة') || normalized.contains('coffee')) {
+      return _pickVariant(coffeePool);
+    }
+    if (normalized.contains('بيتزا') || normalized.contains('pizza')) {
+      return _pickVariant(pizzaPool);
+    }
+    if (normalized.contains('برغر') || normalized.contains('برجر') || normalized.contains('burger') || normalized.contains('burg')) {
+      return _pickVariant(burgerPool);
+    }
+    if (normalized.contains('حلويات') || normalized.contains('حلوى') || normalized.contains('حلى') || normalized.contains('dessert') || normalized.contains('sweet')) {
+      return _pickVariant(dessertPool);
+    }
+    if (normalized.contains('مشروب') ||
+        normalized.contains('مشروبات') ||
+        normalized.contains('عصير') ||
+        normalized.contains('ماء') ||
+        normalized.contains('مياه') ||
+        normalized.contains('drink') ||
+        normalized.contains('juice')) {
+      return _pickVariant(drinkPool);
     }
 
-    return _pickRandom([
+    return _pickVariant([
       _defaultAsset,
       'assets/images/pizza.png',
       'assets/images/dessert.png',
@@ -47,7 +60,16 @@ class ProductCard extends StatelessWidget {
   }
 
   List<String> _assetPool(String baseName, int count) {
-    return [ '$baseName.png' ]; 
+    return List.generate(count, (i) => '$baseName${i + 1}.png');
+  }
+
+  String _pickVariant(List<String> items) {
+    if (items.isEmpty) return _defaultAsset;
+    final variant = product.imageVariant;
+    if (variant != null && variant >= 0) {
+      return items[variant % items.length];
+    }
+    return _pickRandom(items);
   }
 
   String _pickRandom(List<String> items) => items[_random.nextInt(items.length)];
@@ -60,16 +82,15 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  // --- دالة إضافة للسلة ---
   void _addToCart(BuildContext context) {
     final cart = context.read<CartProvider>();
     try {
       cart.addItem(product);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تم إضافة ${product.name} إلى السلة 🛒'),
-          backgroundColor: const Color(0xFF2DBA9D),
-          duration: const Duration(seconds: 1),
+        const SnackBar(
+          content: Text('تمت إضافة المنتج إلى السلة'),
+          backgroundColor: Color(0xFF2DBA9D),
+          duration: Duration(seconds: 1),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -102,7 +123,6 @@ class ProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // --- صورة المنتج وزر المفضلة ---
           Stack(
             children: [
               ClipRRect(
@@ -119,8 +139,6 @@ class ProductCard extends StatelessWidget {
                       : _buildAssetImage(fallbackAsset),
                 ),
               ),
-              
-              // زر المفضلة (القلب)
               Positioned(
                 top: 10,
                 left: 10,
@@ -131,7 +149,6 @@ class ProductCard extends StatelessWidget {
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: () {
-                      // تم التصحيح: إرسال ID كنص مباشرة بدون int.parse
                       context.read<ProductProvider>().toggleFavorite(product.id);
                     },
                     child: Padding(
@@ -147,8 +164,6 @@ class ProductCard extends StatelessWidget {
               ),
             ],
           ),
-
-          // --- تفاصيل المنتج ---
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -176,25 +191,19 @@ class ProductCard extends StatelessWidget {
                     ],
                   ),
                 ],
-                
                 const SizedBox(height: 12),
-                
-                // السعر وزر الإضافة
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // السعر
                     Text(
                       '$priceText د.ل',
                       style: const TextStyle(
-                        color: Color(0xFF2DBA9D), 
-                        fontWeight: FontWeight.bold, 
-                        fontSize: 18
+                        color: Color(0xFF2DBA9D),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                       textDirection: TextDirection.rtl,
                     ),
-
-                    // زر الإضافة للسلة
                     ElevatedButton(
                       onPressed: () => _addToCart(context),
                       style: ElevatedButton.styleFrom(
@@ -208,19 +217,17 @@ class ProductCard extends StatelessWidget {
                         children: [
                           Icon(Icons.add, size: 18),
                           SizedBox(width: 4),
-                          Text('إضافة', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('أضف', style: TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                   ],
                 ),
-                
-                // الوصف
                 if (product.description.isNotEmpty && product.description != 'null') ...[
                   const SizedBox(height: 8),
                   Text(
                     product.description,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
                     textDirection: TextDirection.rtl,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

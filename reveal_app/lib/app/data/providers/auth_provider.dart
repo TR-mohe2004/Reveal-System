@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // ✅ المسارات الصحيحة
 import 'package:reveal_app/app/data/models/user_model.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
@@ -26,9 +27,11 @@ class AuthProvider with ChangeNotifier {
     _checkLoginStatus();
   }
 
-  Future<void> _checkLoginStatus() async {
+    Future<void> _checkLoginStatus() async {
     final token = await _apiService.getToken();
     if (token != null) {
+      _status = AuthStatus.authenticated;
+      notifyListeners();
       await fetchUserProfile();
     } else {
       _status = AuthStatus.unauthenticated;
@@ -36,20 +39,34 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchUserProfile() async {
-    _status = AuthStatus.authenticating;
-    notifyListeners();
+    Future<void> fetchUserProfile() async {
     try {
-      // ✅ تصحيح هام: ApiService الآن ترجع كائن User جاهزاً
-      // لا نحتاج لاستدعاء User.fromJson هنا
+      if (_status != AuthStatus.authenticated) {
+        _status = AuthStatus.authenticating;
+        notifyListeners();
+      }
       _currentUser = await _apiService.getUserProfile();
-      
+      await _persistUserData(_currentUser);
+
       _status = AuthStatus.authenticated;
       notifyListeners();
+    } on ApiException catch (e) {
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        await logout();
+        _errorMessage = 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجدداً';
+        notifyListeners();
+        return;
+      }
+      _errorMessage = e.message;
+      if (_status != AuthStatus.authenticated) {
+        _status = AuthStatus.authenticated;
+      }
+      notifyListeners();
     } catch (e) {
-      // إذا فشل جلب البروفايل (مثلاً التوكن منتهي)، نسجل الخروج
-      await logout();
-      _errorMessage = 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجدداً';
+      _errorMessage = e.toString();
+      if (_status != AuthStatus.authenticated) {
+        _status = AuthStatus.authenticated;
+      }
       notifyListeners();
     }
   }
@@ -93,8 +110,28 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     await _apiService.removeToken();
+    await _clearPersistedUserData();
     _currentUser = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  Future<void> _persistUserData(User? user) async {
+    if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', user.fullName);
+    await prefs.setString('user_email', user.email);
+    if (user.profileImage != null && user.profileImage!.isNotEmpty) {
+      await prefs.setString('user_image', user.profileImage!);
+    } else {
+      await prefs.remove('user_image');
+    }
+  }
+
+  Future<void> _clearPersistedUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_name');
+    await prefs.remove('user_email');
+    await prefs.remove('user_image');
   }
 }

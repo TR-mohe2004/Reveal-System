@@ -33,8 +33,10 @@ class CartProvider extends ChangeNotifier {
   }
 
   // إضافة منتج جديد
-  void addItem(ProductModel product, {int quantity = 1}) {
+  void addItem(ProductModel product, {int quantity = 1, String? options}) {
     final String currentCollegeId = product.collegeId.isNotEmpty ? product.collegeId : "1";
+    final String sanitizedOptions = (options ?? '').trim();
+    final String itemKey = sanitizedOptions.isEmpty ? product.id : '${product.id}::$sanitizedOptions';
     
     // التحقق من الكلية
     if (_items.isNotEmpty) {
@@ -44,30 +46,34 @@ class CartProvider extends ChangeNotifier {
       }
     }
 
-    if (_items.containsKey(product.id)) {
+    if (_items.containsKey(itemKey)) {
       _items.update(
-        product.id,
+        itemKey,
         (existing) => CartItem(
           id: existing.id,
+          productId: existing.productId,
           name: existing.name,
           price: existing.price,
           imageUrl: existing.imageUrl,
           quantity: existing.quantity + quantity,
           collegeId: existing.collegeId,
           collegeName: existing.collegeName,
+          options: existing.options,
         ),
       );
     } else {
       _items.putIfAbsent(
-        product.id,
+        itemKey,
         () => CartItem(
-          id: product.id,
+          id: itemKey,
+          productId: product.id,
           name: product.name,
           price: product.price,
           imageUrl: product.getImageUrl(),
           quantity: quantity,
           collegeId: currentCollegeId,
           collegeName: product.cafeteriaName,
+          options: sanitizedOptions,
         ),
       );
     }
@@ -81,12 +87,14 @@ class CartProvider extends ChangeNotifier {
         productId,
         (existing) => CartItem(
           id: existing.id,
+          productId: existing.productId,
           name: existing.name,
           price: existing.price,
           imageUrl: existing.imageUrl,
           quantity: existing.quantity + 1,
           collegeId: existing.collegeId,
           collegeName: existing.collegeName,
+          options: existing.options,
         ),
       );
       notifyListeners();
@@ -101,12 +109,14 @@ class CartProvider extends ChangeNotifier {
         productId,
         (existing) => CartItem(
           id: existing.id,
+          productId: existing.productId,
           name: existing.name,
           price: existing.price,
           imageUrl: existing.imageUrl,
           quantity: existing.quantity - 1,
           collegeId: existing.collegeId,
           collegeName: existing.collegeName,
+          options: existing.options,
         ),
       );
     } else {
@@ -130,7 +140,11 @@ class CartProvider extends ChangeNotifier {
     
     final List<Map<String, dynamic>> orderItems = [];
     _items.forEach((key, item) {
-      orderItems.add({'product_id': item.id, 'quantity': item.quantity});
+      orderItems.add({
+        'product_id': item.productId,
+        'quantity': item.quantity,
+        'options': item.options,
+      });
     });
 
     final collegeId = _items.values.first.collegeId;

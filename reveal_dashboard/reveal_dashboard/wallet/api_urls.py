@@ -10,4 +10,7 @@ urlpatterns = [
     
     # الرابط سيكون: /api/wallet/topup/
     path('topup/', api_views.topup_wallet, name='topup_wallet'),
+
+    # الرابط سيكون: /api/wallet/transfer/
+    path('transfer/', api_views.transfer_wallet, name='transfer_wallet'),
 ]

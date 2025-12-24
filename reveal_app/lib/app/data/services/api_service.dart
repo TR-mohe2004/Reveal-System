@@ -282,6 +282,37 @@ class ApiService {
     }
   }
 
+  Future<bool> transferWallet({
+    required String walletCode,
+    required double amount,
+    String? note,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/wallet/transfer/');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: await _headers(authRequired: true),
+        body: json.encode({
+          'wallet_code': walletCode,
+          'amount': amount,
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        }),
+      );
+      final data = _decodeBody(response);
+
+      if (response.statusCode == 200 && data is Map && data['success'] == true) {
+        return true;
+      }
+
+      throw _buildException(response, data);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Network error: $e');
+    }
+  }
+
   Future<bool> createOrder(double totalPrice, List<Map<String, dynamic>> items, String _collegeId, {String paymentMethod = 'WALLET'}) async {
     final url = Uri.parse('$baseUrl/api/orders/');
 
@@ -327,4 +358,28 @@ class ApiService {
       throw ApiException('Network error: $e');
     }
   }
+
+  Future<bool> updateSecondaryPhone(String phone) async {
+    final url = Uri.parse('$baseUrl/api/user/secondary-phone/');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: await _headers(authRequired: true),
+        body: json.encode({'secondary_phone': phone}),
+      );
+      final data = _decodeBody(response);
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+
+      throw _buildException(response, data);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Network error: $e');
+    }
+  }
+
 }

@@ -1,6 +1,8 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // مكتبة اختيار الصور
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'package:reveal_app/app/data/providers/profile_image_provider.dart'; // مكتبة اختيار الصور
 import 'package:reveal_app/app/data/models/user_model.dart';
 import 'package:reveal_app/app/data/models/wallet_model.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
@@ -64,9 +66,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _localImage = File(image.path);
       });
+      context.read<ProfileImageProvider>().setPersistentImage(image.path);
       // هنا مفروض يتم استدعاء دالة API لرفع الصورة للسيرفر
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("سيتم حفظ الصورة الجديدة...")),
+        const SnackBar(content: Text("تم حفظ الصورة الجديدة محلياً")),
       );
     }
   }
@@ -114,10 +117,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     const defaultImage = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
     // صورة خلفية جمالية
     const headerImage = "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&q=80"; 
+
+    final persistedPath = context.watch<ProfileImageProvider>().localPath;
+    final localPath = _localImage?.path ?? persistedPath;
+    final ImageProvider<Object> profileImage = (localPath != null && File(localPath).existsSync())
+        ? FileImage(File(localPath)) as ImageProvider<Object>
+        : NetworkImage(userProfile!.profileImage ?? defaultImage) as ImageProvider<Object>;
 
     return Scaffold(
       backgroundColor: Colors.grey[50], // خلفية فاتحة جداً
@@ -175,9 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                                   child: CircleAvatar(
                                     radius: 60,
-                                    backgroundImage: _localImage != null
-                                        ? FileImage(_localImage!) as ImageProvider
-                                        : NetworkImage(userProfile!.profileImage ?? defaultImage),
+                                    backgroundImage: profileImage,
                                   ),
                                 ),
                                 // أيقونة الكاميرا لتغيير الصورة

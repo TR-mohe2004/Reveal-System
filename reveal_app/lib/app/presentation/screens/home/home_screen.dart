@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/models/college_model.dart';
@@ -13,7 +15,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   bool isLoading = true;
   List<ProductModel> allProducts = [];
   List<ProductModel> displayedProducts = [];
@@ -63,8 +65,8 @@ class _HomeScreenState extends State<HomeScreen> {
   };
 
   
-  String userName = "جاري التحميل..."; // سيتم تغييره للاسم الحقيقي
-  String location = "مقهى كلية تقنية المعلومات"; // الافتراضي
+  String userName = "جاري التحميل...";
+  String location = "جاري تحديد المقهى...";
 
   final Color tealColor = const Color(0xFF009688);
   final Color orangeColor = const Color(0xFFFF5722);
@@ -72,11 +74,46 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategory = "all";
 
   final ApiService _apiService = ApiService();
+  late final AnimationController _auroraController;
+
+  String _normalizeCafeName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.contains('تقنية')) {
+      return 'مقهى تقنية المعلومات';
+    }
+    if (trimmed.contains('لغة') || trimmed.contains('العربية')) {
+      return 'مقهى اللغة العربية';
+    }
+    if (trimmed.contains('اقتصاد') || trimmed.contains('الاقتصاد')) {
+      return 'مقهى الاقتصاد';
+    }
+    return trimmed;
+  }
+
+  bool _isSupportedCafeName(String name) {
+    final trimmed = name.trim();
+    return trimmed.contains('تقنية') ||
+        trimmed.contains('لغة') ||
+        trimmed.contains('العربية') ||
+        trimmed.contains('اقتصاد') ||
+        trimmed.contains('الاقتصاد');
+  }
 
   @override
   void initState() {
     super.initState();
+    _auroraController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    )..repeat();
     _fetchRealData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _auroraController.dispose();
+    super.dispose();
   }
 
   // دالة جلب البيانات الحقيقية (المستخدم + المنتجات)
@@ -88,16 +125,17 @@ class _HomeScreenState extends State<HomeScreen> {
           userName = userProfile.fullName;
         });
       } catch (e) {
-        setState(() => userName = "??????");
+        setState(() => userName = "مستخدم");
       }
 
       final cafesData = await _apiService.getCafes();
+      final filtered = cafesData.where((cafe) => _isSupportedCafeName(cafe.name)).toList();
       if (mounted) {
         setState(() {
-          cafes = cafesData;
+          cafes = filtered.isNotEmpty ? filtered : cafesData;
           if (selectedCafeId == null && cafes.isNotEmpty) {
             selectedCafeId = cafes.first.id;
-            location = cafes.first.name;
+            location = _normalizeCafeName(cafes.first.name);
           }
         });
       }
@@ -112,9 +150,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchProductsForCafe(String? cafeId) async {
     try {
       final productsData = await _apiService.getProducts(cafeId: cafeId);
+      final normalizedCafeId = (cafeId ?? '').toString();
+      final filtered = normalizedCafeId.isEmpty
+          ? productsData
+          : productsData.where((p) => p.cafeId == normalizedCafeId).toList();
       if (mounted) {
         setState(() {
-          allProducts = productsData;
+          allProducts = filtered.isNotEmpty ? filtered : productsData;
           displayedProducts = List.from(allProducts);
           isLoading = false;
         });
@@ -129,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (selectedCafeId == cafe.id) return;
     setState(() {
       selectedCafeId = cafe.id;
-      location = cafe.name;
+      location = _normalizeCafeName(cafe.name);
       _selectedCategory = 'all';
       isLoading = true;
     });
@@ -147,14 +189,22 @@ class _HomeScreenState extends State<HomeScreen> {
     if (text.contains('dessert') || text.contains('sweet') || text.contains('حلويات') || text.contains('حلوى') || text.contains('حلى')) {
       return 'dessert';
     }
-    if (text.contains('drink') || text.contains('coffee') || text.contains('juice') || text.contains('مشروب') || text.contains('مشروبات') || text.contains('قهوة') || text.contains('عصير')) {
+    if (text.contains('drink') ||
+        text.contains('coffee') ||
+        text.contains('juice') ||
+        text.contains('مشروب') ||
+        text.contains('مشروبات') ||
+        text.contains('عصير') ||
+        text.contains('قهوة') ||
+        text.contains('ماء') ||
+        text.contains('مياه')) {
       return 'drink';
     }
     return 'other';
   }
 
   List<ProductModel> _categoryProducts(String key) {
-    return allProducts.where((p) => _categoryKeyFor(p) == key).take(6).toList();
+    return allProducts.where((p) => _categoryKeyFor(p) == key).take(5).toList();
   }
 
 void _runSearch(String keyword) {
@@ -265,10 +315,13 @@ void _runSearch(String keyword) {
 ),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: tealColor))
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          : Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 140),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                   // 1. الترحيب (الاسم الحقيقي)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -346,7 +399,7 @@ void _runSearch(String keyword) {
 
                   // 5. شبكة المنتجات (قابلة للضغط)
                   allProducts.isEmpty
-                      ? const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("?? ???? ?????? ??????")))
+                      ? const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("لا توجد منتجات حالياً")))
                       : _selectedCategory == "all"
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,9 +428,45 @@ void _runSearch(String keyword) {
                               ),
                             ),
 
-                  const SizedBox(height: 20),
-                ],
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _auroraController,
+                    builder: (context, _) {
+                      final t = _auroraController.value * math.pi * 2;
+                      final drift = math.sin(t) * 10;
+                      final shift = math.cos(t) * 0.3;
+                      return Transform.translate(
+                        offset: Offset(0, drift),
+                        child: Container(
+                          height: 140,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment(-0.6 + shift, -1),
+                              end: Alignment(0.6 - shift, 1),
+                              colors: [
+                                Colors.transparent,
+                                const Color(0xFFB2F5EA).withOpacity(0.22),
+                                const Color(0xFF80DEEA).withOpacity(0.3),
+                                const Color(0xFF4DD0E1).withOpacity(0.36),
+                              ],
+                              stops: const [0.0, 0.45, 0.75, 1.0],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              ],
             ),
     );
   }
@@ -396,7 +485,7 @@ void _runSearch(String keyword) {
           final cafe = cafes[index];
           final isSelected = cafe.id == selectedCafeId;
           return ChoiceChip(
-            label: Text(cafe.name),
+            label: Text(_normalizeCafeName(cafe.name)),
             selected: isSelected,
             selectedColor: tealColor,
             labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
@@ -433,21 +522,63 @@ void _runSearch(String keyword) {
 
     return InkWell(
       onTap: () => _filterByCategory(key),
-      child: Container(
-        width: 90,
-        padding: const EdgeInsets.all(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        width: 98,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSelected ? tealColor.withOpacity(0.15) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: isSelected ? tealColor : Colors.grey.shade200),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, 3))],
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    tealColor.withOpacity(0.9),
+                    const Color(0xFF4DD0E1).withOpacity(0.9),
+                  ],
+                )
+              : LinearGradient(
+                  colors: [
+                    Colors.white,
+                    Colors.grey.shade50,
+                  ],
+                ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: isSelected ? tealColor.withOpacity(0.2) : Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected ? tealColor.withOpacity(0.25) : Colors.black.withOpacity(0.05),
+              blurRadius: isSelected ? 12 : 8,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(asset, height: 36, width: 36, fit: BoxFit.contain),
-            const SizedBox(height: 6),
-            Text(label, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withOpacity(0.95) : Colors.grey.shade100,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Image.asset(asset, height: 26, width: 26, fit: BoxFit.contain),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -489,9 +620,25 @@ void _runSearch(String keyword) {
   }
 
   Widget _buildProductImage(ProductModel product, String categoryKey, int index) {
+    final text = '${product.category} ${product.name}'.toLowerCase();
+    if (text.contains('قهوة') || text.contains('coffee')) {
+      final coffeeAssets = [
+        'assets/images/coffee_placeholder.png',
+        'assets/images/coffee_placeholder2.png',
+      ];
+      final variantIndex = (product.imageVariant != null && product.imageVariant! >= 0)
+          ? product.imageVariant!
+          : index;
+      final coffeeAsset = coffeeAssets[variantIndex % coffeeAssets.length];
+      return Image.asset(coffeeAsset, width: double.infinity, fit: BoxFit.cover);
+    }
+
     final assets = _categoryAssets[categoryKey];
+    final variantIndex = (product.imageVariant != null && product.imageVariant! >= 0)
+        ? product.imageVariant!
+        : index;
     final fallbackAsset = (assets != null && assets.isNotEmpty)
-        ? assets[index % assets.length]
+        ? assets[variantIndex % assets.length]
         : 'assets/images/logo.png';
 
     if (product.imageUrl.isNotEmpty && product.imageUrl.startsWith('http')) {
@@ -594,7 +741,7 @@ void _runSearch(String keyword) {
                           try {
                             context.read<CartProvider>().addItem(product);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("??? ????? ${product.name} ?????")),
+                              SnackBar(content: Text("تمت إضافة ${product.name} للسلة")),
                             );
                           } on MismatchedCollegeException catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(

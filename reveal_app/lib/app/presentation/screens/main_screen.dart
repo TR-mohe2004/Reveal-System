@@ -1,15 +1,23 @@
 // lib/app/presentation/screens/main_screen.dart
 
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // لتحديث الحالة عند تغيير الكلية
-import 'package:shared_preferences/shared_preferences.dart'; // لجلب الاسم والصورة المحفوظة
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:reveal_app/app/data/providers/notification_provider.dart';
+import 'package:reveal_app/app/data/providers/navigation_provider.dart';
+import 'package:reveal_app/app/data/providers/profile_image_provider.dart'; // لجلب الاسم والصورة المحفوظة
 
 // استدعاء الصفحات
 import 'wallet/wallet_screen.dart';
 import 'cart/cart_screen.dart';
 import 'orders/orders_screen.dart';
 import 'home/home_screen.dart';
-import 'profile/profile_screen.dart'; // تأكد من الاسم الصحيح
+import 'profile/profile_screen.dart';
+import 'notifications/notifications_screen.dart';
+import 'settings/settings_screen.dart';
+import 'support/support_screen.dart'; // تأكد من الاسم الصحيح
 
 // استدعاء المودل والخدمات إذا لزم الأمر
 import '../../data/services/api_service.dart';
@@ -21,8 +29,7 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 4; // نبدأ من الرئيسية
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   String _userName = "جاري التحميل...";
   String _userEmail = "";
   String? _userImage; // مسار الصورة إذا وجدت
@@ -31,10 +38,26 @@ class _MainScreenState extends State<MainScreen> {
   final Color tealColor = const Color(0xFF009688);
   final Color orangeColor = const Color(0xFFFF5722);
 
+  late final AnimationController _bellController;
+  late final Animation<double> _bellPulse;
+  Timer? _notificationTimer;
+  bool _isRefreshingNotifications = false;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _bellController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _bellPulse = Tween<double>(begin: 0.85, end: 1.15).animate(
+      CurvedAnimation(parent: _bellController, curve: Curves.easeInOut),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().load();
+      _startNotificationPolling();
+    });
   }
 
   // جلب بيانات المستخدم الحقيقية للدرج
@@ -50,10 +73,17 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final api = ApiService();
       final user = await api.getUserProfile();
+      await prefs.setString('user_name', user.fullName);
+      await prefs.setString('user_email', user.email);
+      if (user.profileImage != null && user.profileImage!.isNotEmpty) {
+        await prefs.setString('user_image', user.profileImage!);
+      } else {
+        await prefs.remove('user_image');
+      }
       setState(() {
         _userName = user.fullName;
         _userEmail = user.email;
-        // _userImage = user.image; // إذا كان المودل يدعم الصورة
+        _userImage = user.profileImage;
       });
     } catch (e) {
       // تجاهل الخطأ، نعتمد على الكاش
@@ -78,13 +108,50 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
+    context.read<NavigationProvider>().setIndex(index);
+  }
+
+  void _startNotificationPolling() {
+    if (_notificationTimer != null) {
+      return;
+    }
+    _refreshNotifications();
+    _notificationTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _refreshNotifications();
     });
+  }
+
+  Future<void> _refreshNotifications() async {
+    if (_isRefreshingNotifications) {
+      return;
+    }
+    _isRefreshingNotifications = true;
+    final provider = context.read<NotificationProvider>();
+
+    try {
+      final api = ApiService();
+      final orders = await api.getOrders();
+      if (!mounted) {
+        return;
+      }
+      await provider.refreshFromOrders(orders);
+    } catch (_) {
+      // ignore polling errors
+    } finally {
+      _isRefreshingNotifications = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationTimer?.cancel();
+    _bellController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = context.watch<NavigationProvider>().currentIndex;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -94,14 +161,52 @@ class _MainScreenState extends State<MainScreen> {
           elevation: 0,
           centerTitle: true,
           title: Text(
-            _titles[_selectedIndex],
+            _titles[currentIndex],
             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
           ),
           iconTheme: const IconThemeData(color: Colors.black),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications_active_outlined, color: Colors.amber), // تنبيه بلون مميز
-              onPressed: () {},
+            Consumer<NotificationProvider>(
+              builder: (context, provider, _) {
+                final count = provider.unreadCount;
+                if (count > 0 && !_bellController.isAnimating) {
+                  _bellController.repeat(reverse: true);
+                } else if (count == 0 && _bellController.isAnimating) {
+                  _bellController.stop();
+                }
+
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications_active_outlined, color: Colors.amber),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                        );
+                        await context.read<NotificationProvider>().markAllRead();
+                      },
+                    ),
+                    if (count > 0)
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: ScaleTransition(
+                          scale: _bellPulse,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -111,36 +216,31 @@ class _MainScreenState extends State<MainScreen> {
 
         // 3. المحتوى
         body: IndexedStack(
-          index: _selectedIndex,
+          index: currentIndex,
           children: _screens,
         ),
 
         // 4. الشريط السفلي
-        bottomNavigationBar: Container(
-          decoration: const BoxDecoration(
-            boxShadow: [
-              BoxShadow(color: Colors.black12, blurRadius: 15, spreadRadius: 1),
-            ],
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: _onItemTapped,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.grey,
-            showSelectedLabels: true,
-            showUnselectedLabels: true,
-            selectedFontSize: 12,
-            unselectedFontSize: 10,
-            elevation: 0,
-            items: [
-              _buildNavItem(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'المحفظة', 0),
-              _buildNavItem(Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة', 1),
-              _buildNavItem(Icons.person_outline, Icons.person, 'الملف', 2),
-              _buildNavItem(Icons.receipt_long_outlined, Icons.receipt_long, 'الطلبات', 3),
-              _buildNavItem(Icons.home_outlined, Icons.home, 'الرئيسية', 4),
-            ],
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 18, offset: const Offset(0, 8)),
+              ],
+            ),
+            child: Row(
+              children: [
+                _buildBottomNavItem(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'المحفظة', 0),
+                _buildBottomNavItem(Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة', 1),
+                _buildBottomNavItem(Icons.person_outline, Icons.person, 'الملف', 2),
+                _buildBottomNavItem(Icons.receipt_long_outlined, Icons.receipt_long, 'الطلبات', 3),
+                _buildBottomNavItem(Icons.home_outlined, Icons.home, 'الرئيسية', 4),
+              ],
+            ),
           ),
         ),
       ),
@@ -162,55 +262,61 @@ class _MainScreenState extends State<MainScreen> {
               gradient: LinearGradient(colors: [tealColor, const Color(0xFF4DB6AC)]),
               borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30)),
             ),
-            child: Row(
-              children: [
-                // الصورة (نفس منطق البروفايل)
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: const [BoxShadow(blurRadius: 10, color: Colors.black26)],
-                  ),
-                  child: CircleAvatar(
-                    radius: 35,
-                    backgroundColor: Colors.white,
-                    backgroundImage: (_userImage != null && _userImage!.isNotEmpty)
-                        ? NetworkImage(_userImage!) // صورة من السيرفر
-                        : null,
-                    child: (_userImage == null || _userImage!.isEmpty)
-                        ? Text(
-                            _userName.isNotEmpty ? _userName[0].toUpperCase() : "A",
-                            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: tealColor),
-                          )
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 15),
-                // الاسم والايميل
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _userName,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+            child: Builder(
+              builder: (context) {
+                final localProfilePath = context.watch<ProfileImageProvider>().localPath;
+                ImageProvider<Object>? profileImage;
+                if (localProfilePath != null && File(localProfilePath).existsSync()) {
+                  profileImage = FileImage(File(localProfilePath)) as ImageProvider<Object>;
+                } else if (_userImage != null && _userImage!.isNotEmpty) {
+                  profileImage = NetworkImage(_userImage!) as ImageProvider<Object>;
+                }
+                return Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: const [BoxShadow(blurRadius: 10, color: Colors.black26)],
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        _userEmail,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: CircleAvatar(
+                        radius: 35,
+                        backgroundColor: Colors.white,
+                        backgroundImage: profileImage,
+                        child: profileImage == null
+                            ? Text(
+                                _userName.isNotEmpty ? _userName[0].toUpperCase() : "A",
+                                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: tealColor),
+                              )
+                            : null,
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _userName,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            _userEmail,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
-
           const SizedBox(height: 10),
 
           // عناصر القائمة
@@ -235,8 +341,20 @@ class _MainScreenState extends State<MainScreen> {
 
                 const Divider(thickness: 1, indent: 20, endIndent: 20),
                 
-                _buildSimpleItem(Icons.settings_outlined, "الإعدادات", () {}),
-                _buildSimpleItem(Icons.help_outline, "المساعدة والدعم", () {}),
+                _buildSimpleItem(Icons.settings_outlined, "الإعدادات", () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                }),
+                _buildSimpleItem(Icons.help_outline, "المساعدة والدعم", () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SupportScreen()),
+                  );
+                }),
                 
                 const SizedBox(height: 20),
                 _buildSimpleItem(Icons.logout, "تسجيل الخروج", () {
@@ -252,7 +370,7 @@ class _MainScreenState extends State<MainScreen> {
 
   // عنصر القائمة الأساسي (للتنقل بين التبويبات)
   Widget _buildDrawerItem(IconData icon, String title, int indexTarget) {
-    bool isSelected = _selectedIndex == indexTarget;
+    bool isSelected = context.watch<NavigationProvider>().currentIndex == indexTarget;
     return ListTile(
       leading: Icon(icon, color: isSelected ? tealColor : Colors.grey[700]),
       title: Text(
@@ -306,26 +424,51 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // أيقونة الشريط السفلي
-  BottomNavigationBarItem _buildNavItem(IconData icon, IconData activeIcon, String label, int index) {
-    bool isSelected = _selectedIndex == index;
-    return BottomNavigationBarItem(
-      icon: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: isSelected
-            ? BoxDecoration(
-                color: orangeColor,
-                shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: orangeColor.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))],
-              )
-            : null,
-        child: Icon(
-          isSelected ? activeIcon : icon,
-          color: isSelected ? Colors.white : tealColor,
-          size: 22,
+  Widget _buildBottomNavItem(IconData icon, IconData activeIcon, String label, int index) {
+    final isSelected = context.watch<NavigationProvider>().currentIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onItemTapped(index),
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? tealColor.withOpacity(0.08) : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: isSelected ? orangeColor : Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: orangeColor.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))]
+                      : [],
+                ),
+                child: Icon(
+                  isSelected ? activeIcon : icon,
+                  color: isSelected ? Colors.white : tealColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? tealColor : Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      label: label,
     );
   }
 }
