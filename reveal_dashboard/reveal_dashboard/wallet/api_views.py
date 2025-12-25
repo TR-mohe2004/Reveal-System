@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from firebase_admin import auth as fb_auth
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -12,6 +12,19 @@ from .models import Wallet, Transaction
 from .serializers import WalletSerializer
 
 User = get_user_model()
+
+def _sync_wallet_balance(wallet):
+    aggregates = wallet.transactions.aggregate(
+        deposits=Sum('amount', filter=Q(transaction_type__in=['DEPOSIT', 'deposit'])),
+        withdrawals=Sum('amount', filter=Q(transaction_type__in=['WITHDRAWAL', 'withdrawal'])),
+    )
+    deposits = aggregates.get('deposits') or Decimal('0')
+    withdrawals = aggregates.get('withdrawals') or Decimal('0')
+    new_balance = deposits - withdrawals
+    if wallet.balance != new_balance:
+        wallet.balance = new_balance
+        wallet.save(update_fields=['balance'])
+    return wallet
 
 def verify_token_get_user(request):
     """
@@ -63,6 +76,7 @@ def get_wallet(request):
         return Response({'error': str(e)}, status=401)
 
     wallet, _ = Wallet.objects.get_or_create(user=user)
+    wallet = _sync_wallet_balance(wallet)
     
     # جلب آخر 20 معاملة فقط لتقليل الضغط على السيرفر
     recent_transactions = wallet.transactions.order_by('-created_at')[:20]

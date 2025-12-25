@@ -42,7 +42,7 @@ class Transaction(models.Model):
     def save(self, *args, **kwargs):
         # Transaction Logic: Update wallet balance atomically
         with transaction.atomic():
-            if not self.pk: 
+            if self._state.adding:
                 # Lock wallet row for update to prevent race conditions
                 wallet = Wallet.objects.select_for_update().get(pk=self.wallet.pk)
                 

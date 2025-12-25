@@ -317,127 +317,136 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // قائمة المفضلات (تفاعلية)
+    // قائمة المفضلة (اختياري)
     final favorites = allProducts.where((p) => p.isFavorite).toList();
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: isLoading
-          ? Center(child: CircularProgressIndicator(color: tealColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. الترحيب (الاسم الحقيقي)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text("موقعك الحالي:", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                            Text(location, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text("أهلاً بك،", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                            Text(userName, style: TextStyle(fontWeight: FontWeight.bold, color: tealColor, fontSize: 16)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  // 2. البحث
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(30)),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: _runSearch,
-                        textAlign: TextAlign.right,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          hintText: "ابحث عن وجبتك المفضلة...",
-                          prefixIcon: Icon(Icons.search, color: tealColor),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
+      body: SafeArea(
+        bottom: false,
+        child: isLoading
+            ? Center(child: CircularProgressIndicator(color: tealColor))
+            : SingleChildScrollView(
+                padding: EdgeInsets.only(bottom: 140 + bottomInset),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. الرأس (المقهى الحالي)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("المقهى الحالي:", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(location, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text("مرحباً بك", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text(userName, style: TextStyle(fontWeight: FontWeight.bold, color: tealColor, fontSize: 16)),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 15),
 
-                  _buildCategoryTiles(),
-                  const SizedBox(height: 20),
-
-                  // 3. قسم "الأحببتها" (المفضلة) - ظهر من جديد!
-                  if (favorites.isNotEmpty) ...[
+                    // 2. البحث
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text("الأحببتها ❤️", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 140,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: favorites.length,
-                        itemBuilder: (context, index) => _buildFavoriteCard(favorites[index]),
+                      child: Container(
+                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(30)),
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: _runSearch,
+                          textAlign: TextAlign.right,
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "ابحث عن اسم المنتج...",
+                            prefixIcon: Icon(Icons.search, color: tealColor),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ),
                     ),
+
+                    const SizedBox(height: 20),
+
+                    _buildCategoryTiles(),
+                    const SizedBox(height: 20),
+
+                    // 3. قسم "المفضلة" (اختياري)
+                    if (favorites.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text("المفضلة لديك", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 140,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: favorites.length,
+                          itemBuilder: (context, index) => _buildFavoriteCard(favorites[index]),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // 5. عرض المنتجات (حسب الفئة)
+                    allProducts.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(40),
+                              child: Text("لا توجد منتجات حالياً"),
+                            ),
+                          )
+                        : _selectedCategory == "all"
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildCategorySection('burger', 'برغر'),
+                                  _buildCategorySection('pizza', 'بيتزا'),
+                                  _buildCategorySection('dessert', 'حلويات'),
+                                  _buildCategorySection('drink', 'مشروبات'),
+                                ],
+                              )
+                            : GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                padding: const EdgeInsets.all(16),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: 0.75,
+                                  crossAxisSpacing: 15,
+                                  mainAxisSpacing: 15,
+                                ),
+                                itemCount: displayedProducts.length,
+                                itemBuilder: (context, index) => _buildProductCard(
+                                  displayedProducts[index],
+                                  categoryKey: _categoryKeyFor(displayedProducts[index]),
+                                  index: index,
+                                ),
+                              ),
+
                     const SizedBox(height: 20),
                   ],
-
-
-                  // 5. شبكة المنتجات (قابلة للضغط)
-                  allProducts.isEmpty
-                      ? const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("لا توجد منتجات حالياً")))
-                      : _selectedCategory == "all"
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildCategorySection('burger', 'برغر'),
-                                _buildCategorySection('pizza', 'بيتزا'),
-                                _buildCategorySection('dessert', 'حلويات'),
-                                _buildCategorySection('drink', 'مشروبات'),
-                              ],
-                            )
-                          : GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 0.75,
-                                crossAxisSpacing: 15,
-                                mainAxisSpacing: 15,
-                              ),
-                              itemCount: displayedProducts.length,
-                              itemBuilder: (context, index) => _buildProductCard(
-                                displayedProducts[index],
-                                categoryKey: _categoryKeyFor(displayedProducts[index]),
-                                index: index,
-                              ),
-                            ),
-
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
   // --- Widgets ---
+
 
   Widget _buildCategoryTiles() {
     final tiles = [
@@ -446,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return SizedBox(
-      height: 90,
+      height: 104,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -468,8 +477,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
-        width: 98,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        width: 104,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         decoration: BoxDecoration(
           gradient: isSelected
               ? LinearGradient(
@@ -484,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Colors.grey.shade50,
                   ],
                 ),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: isSelected ? tealColor.withOpacity(0.2) : Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
@@ -498,6 +508,8 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
+              width: 42,
+              height: 42,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white.withOpacity(0.95) : Colors.grey.shade100,
@@ -678,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("${product.price} ?.?", style: TextStyle(color: tealColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text("${product.price} د.ل", style: TextStyle(color: tealColor, fontWeight: FontWeight.bold, fontSize: 14)),
                       InkWell(
                         onTap: () {
                           try {

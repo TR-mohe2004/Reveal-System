@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/providers/profile_image_provider.dart'; // مكتبة اختيار الصور
 import 'package:reveal_app/app/data/models/user_model.dart';
@@ -62,15 +63,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // دالة اختيار صورة
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("لم يتم اختيار صورة")),
+        );
+        return;
+      }
+
+      final directory = await getApplicationDocumentsDirectory();
+      final rawPath = image.path;
+      final ext = rawPath.contains('.') ? rawPath.split('.').last : 'jpg';
+      final savedPath = '${directory.path}/profile_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final savedImage = await File(rawPath).copy(savedPath);
+
       setState(() {
-        _localImage = File(image.path);
+        _localImage = savedImage;
       });
-      context.read<ProfileImageProvider>().setPersistentImage(image.path);
+      await context.read<ProfileImageProvider>().setPersistentImage(savedImage.path);
+
+      if (!mounted) return;
       // هنا مفروض يتم استدعاء دالة API لرفع الصورة للسيرفر
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("تم حفظ الصورة الجديدة محلياً")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("تعذر فتح المعرض: $e")),
       );
     }
   }
