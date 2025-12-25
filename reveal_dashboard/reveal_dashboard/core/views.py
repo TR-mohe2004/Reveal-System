@@ -27,7 +27,7 @@ from .serializers import ProductSerializer, OrderSerializer, UserSerializer, Caf
 from .utils import normalize_libyan_phone, send_real_notification
 from .api_views import invalidate_products_cache
 
-DEFAULT_CATEGORY_NAMES = ['برغر', 'بيتزا', 'حلويات', 'مشروبات', 'قهوة', 'Food', 'Drinks', 'Snacks']
+DEFAULT_CATEGORY_NAMES = ['برغر', 'بيتزا', 'حلويات', 'مشروبات', 'قهوة']
 
 # --- Helper Functions ---
 
@@ -50,12 +50,13 @@ def ensure_categories_for_cafe(cafe):
     """
     التأكد من وجود تصنيفات افتراضية للمقهى.
     """
-    categories_qs = Category.objects.filter(products__cafe=cafe).distinct()
-    if not categories_qs.exists():
-        for name in DEFAULT_CATEGORY_NAMES:
+    existing_defaults = set(Category.objects.filter(name__in=DEFAULT_CATEGORY_NAMES).values_list('name', flat=True))
+    for name in DEFAULT_CATEGORY_NAMES:
+        if name not in existing_defaults:
             Category.objects.get_or_create(name=name)
-        categories_qs = Category.objects.filter(name__in=DEFAULT_CATEGORY_NAMES)
-    return categories_qs
+    return Category.objects.filter(
+        Q(name__in=DEFAULT_CATEGORY_NAMES) | Q(products__cafe=cafe)
+    ).distinct().order_by('name')
 
 
 # =========================================================
