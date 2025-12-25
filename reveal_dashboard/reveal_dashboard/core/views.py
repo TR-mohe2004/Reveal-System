@@ -27,7 +27,7 @@ from .serializers import ProductSerializer, OrderSerializer, UserSerializer, Caf
 from .utils import normalize_libyan_phone, send_real_notification
 from .api_views import invalidate_products_cache
 
-DEFAULT_CATEGORY_NAMES = ['Food', 'Drinks', 'Snacks']
+DEFAULT_CATEGORY_NAMES = ['برغر', 'بيتزا', 'حلويات', 'مشروبات', 'قهوة', 'Food', 'Drinks', 'Snacks']
 
 # --- Helper Functions ---
 
