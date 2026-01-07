@@ -1,16 +1,14 @@
-// lib/app/presentation/screens/main_screen.dart
-
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // لتحديث الحالة عند تغيير الكلية
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:reveal_app/app/data/providers/notification_provider.dart';
-import 'package:reveal_app/app/data/providers/navigation_provider.dart';
-import 'package:reveal_app/app/data/providers/profile_image_provider.dart'; // لجلب الاسم والصورة المحفوظة
+import 'package:reveal_app/app/data/providers/auth_provider.dart';
 import 'package:reveal_app/app/data/providers/college_provider.dart';
-
-// استدعاء الصفحات
+import 'package:reveal_app/app/data/providers/navigation_provider.dart';
+import 'package:reveal_app/app/data/providers/notification_provider.dart';
+import 'package:reveal_app/app/data/providers/profile_image_provider.dart';
+import 'package:reveal_app/app/data/services/api_service.dart';
 import 'wallet/wallet_screen.dart';
 import 'cart/cart_screen.dart';
 import 'orders/orders_screen.dart';
@@ -18,10 +16,7 @@ import 'home/home_screen.dart';
 import 'profile/profile_screen.dart';
 import 'notifications/notifications_screen.dart';
 import 'settings/settings_screen.dart';
-import 'support/support_screen.dart'; // تأكد من الاسم الصحيح
-
-// استدعاء المودل والخدمات إذا لزم الأمر
-import '../../data/services/api_service.dart';
+import 'support/support_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -33,9 +28,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   String _userName = "جاري التحميل...";
   String _userEmail = "";
-  String? _userImage; // مسار الصورة إذا وجدت
+  String? _userImage;
 
-  // الألوان الرسمية
   final Color tealColor = const Color(0xFF009688);
   final Color orangeColor = const Color(0xFFFF5722);
 
@@ -62,16 +56,14 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     });
   }
 
-  // جلب بيانات المستخدم الحقيقية للدرج
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userName = prefs.getString('user_name') ?? "يا بطل";
+      _userName = prefs.getString('user_name') ?? "مستخدم";
       _userEmail = prefs.getString('user_email') ?? "";
-      _userImage = prefs.getString('user_image'); // نفترض أننا حفظنا مسار الصورة عند الدخول
+      _userImage = prefs.getString('user_image');
     });
 
-    // محاولة جلب أحدث البيانات من السيرفر
     try {
       final api = ApiService();
       final user = await api.getUserProfile();
@@ -87,9 +79,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         _userEmail = user.email;
         _userImage = user.profileImage;
       });
-    } catch (e) {
-      // تجاهل الخطأ، نعتمد على الكاش
-    }
+    } catch (_) {}
   }
 
   String _normalizeCafeName(String name) {
@@ -130,20 +120,19 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   }
 
   final List<String> _titles = [
-    'المحفظة الإلكترونية',
-    'سلة المشتريات',
+    'المحفظة',
+    'السلة',
     'الملف الشخصي',
-    'طلباتي السابقة',
-    'الجامعة الاسمرية',
+    'طلباتي',
+    'الرئيسية',
   ];
 
-  // صفحات التطبيق
   final List<Widget> _screens = const [
-    WalletScreen(),       // 0
-    CartScreen(),         // 1
-    ProfileScreen(),      // 2
-    OrdersScreen(),       // 3
-    HomeScreen(),         // 4
+    WalletScreen(),
+    CartScreen(),
+    ProfileScreen(),
+    OrdersScreen(),
+    HomeScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -194,7 +183,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        // 1. الشريط العلوي (يظهر في كل الصفحات)
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -249,17 +237,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
-
-        // 2. القائمة الجانبية (Hamburger Menu) الواقعية
         drawer: _buildDrawer(),
-
-        // 3. المحتوى
         body: IndexedStack(
           index: currentIndex,
           children: _screens,
         ),
-
-        // 4. الشريط السفلي
         bottomNavigationBar: SafeArea(
           child: Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -275,8 +257,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               children: [
                 _buildBottomNavItem(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'المحفظة', 0),
                 _buildBottomNavItem(Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة', 1),
-                _buildBottomNavItem(Icons.person_outline, Icons.person, 'الملف', 2),
-                _buildBottomNavItem(Icons.receipt_long_outlined, Icons.receipt_long, 'الطلبات', 3),
+                _buildBottomNavItem(Icons.person_outline, Icons.person, 'الملف الشخصي', 2),
+                _buildBottomNavItem(Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي', 3),
                 _buildBottomNavItem(Icons.home_outlined, Icons.home, 'الرئيسية', 4),
               ],
             ),
@@ -286,7 +268,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- تصميم القائمة الجانبية المطور (Real Drawer) ---
   Widget _buildDrawer() {
     return Drawer(
       shape: const RoundedRectangleBorder(
@@ -294,7 +275,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       ),
       child: Column(
         children: [
-          // رأس القائمة المطور
           Container(
             padding: const EdgeInsets.only(top: 50, bottom: 20, right: 20, left: 20),
             decoration: BoxDecoration(
@@ -357,8 +337,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
             ),
           ),
           const SizedBox(height: 10),
-
-          // عناصر القائمة
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -366,14 +344,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                 _buildDrawerItem(Icons.home_rounded, "الرئيسية", 4),
                 _buildDrawerItem(Icons.person_rounded, "الملف الشخصي", 2),
                 _buildDrawerItem(Icons.account_balance_wallet_rounded, "المحفظة", 0),
-                
                 const Divider(thickness: 1, indent: 20, endIndent: 20),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  child: Text("الكليات المتاحة", style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold)),
+                  child: Text("المقاهي المتاحة", style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold)),
                 ),
-                
-                // الكليات الثلاث الحقيقية
                 Consumer<CollegeProvider>(
                   builder: (context, collegeProvider, _) {
                     final cafes = collegeProvider.colleges
@@ -402,9 +377,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     );
                   },
                 ),
-
                 const Divider(thickness: 1, indent: 20, endIndent: 20),
-                
                 _buildSimpleItem(Icons.settings_outlined, "الإعدادات", () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -419,10 +392,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     MaterialPageRoute(builder: (_) => const SupportScreen()),
                   );
                 }),
-                
                 const SizedBox(height: 20),
-                _buildSimpleItem(Icons.logout, "تسجيل الخروج", () {
-                   // منطق الخروج هنا (مسح التوكن والانتقال لصفحة الدخول)
+                _buildSimpleItem(Icons.logout, "تسجيل الخروج", () async {
+                  Navigator.pop(context);
+                  await context.read<AuthProvider>().logout();
+                  if (!mounted) return;
+                  Navigator.of(context).pushNamedAndRemoveUntil('/welcome', (route) => false);
                 }, isDestructive: true),
               ],
             ),
@@ -432,7 +407,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
   }
 
-  // عنصر القائمة الأساسي (للتنقل بين التبويبات)
   Widget _buildDrawerItem(IconData icon, String title, int indexTarget) {
     bool isSelected = context.watch<NavigationProvider>().currentIndex == indexTarget;
     return ListTile(
@@ -454,7 +428,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
   }
 
-  // عنصر الكلية (تفاعلي)
   Widget _buildCollegeItem({
     required String title,
     required IconData icon,
@@ -482,7 +455,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
   }
 
-  // عنصر بسيط (إعدادات، خروج...)
   Widget _buildSimpleItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
     return ListTile(
       leading: Icon(icon, color: isDestructive ? Colors.red : Colors.grey[700]),

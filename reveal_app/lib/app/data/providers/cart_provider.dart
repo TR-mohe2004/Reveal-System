@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:reveal_app/app/data/models/cart_item_model.dart';
+import 'package:reveal_app/app/data/models/order_model.dart';
 import 'package:reveal_app/app/data/models/product_model.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
+import 'package:reveal_app/app/core/utils/smart_image_util.dart';
 
 class MismatchedCollegeException implements Exception {
   final String message;
@@ -132,6 +134,33 @@ class CartProvider extends ChangeNotifier {
 
   void clear() {
     _items.clear();
+    notifyListeners();
+  }
+
+  void replaceWithOrder(OrderModel order) {
+    _items.clear();
+    final cafeId = order.cafeId ?? '';
+    final cafeName = order.displayCafeName;
+
+    for (final item in order.items) {
+      final productId = item.productId.toString();
+      final options = item.options.trim();
+      final itemKey = options.isEmpty ? productId : '$productId::$options';
+      final imagePath = SmartImageUtil.getImagePath(item.productName, item.productImage);
+
+      _items[itemKey] = CartItem(
+        id: itemKey,
+        productId: productId,
+        name: item.productName,
+        price: item.price,
+        imageUrl: imagePath,
+        quantity: item.quantity,
+        collegeId: cafeId,
+        collegeName: cafeName,
+        options: options,
+      );
+    }
+
     notifyListeners();
   }
 

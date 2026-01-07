@@ -43,9 +43,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final phone = _secondaryPhoneController.text.trim();
       await _apiService.updateSecondaryPhone(phone);
+      await _loadProfile();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ الرقم الإضافي')),
+        const SnackBar(content: Text('تم تحديث الرقم الإضافي بنجاح')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -77,7 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Card(
             child: SwitchListTile(
-              title: const Text('وضع الليل / الداكن'),
+              title: const Text('الوضع الليلي / الداكن'),
               value: themeProvider.isDarkMode,
               onChanged: (value) => themeProvider.setDarkMode(value),
               secondary: const Icon(Icons.dark_mode_outlined),
@@ -91,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'رقم إضافي للدخول',
+                    'رقم إضافي لتسجيل الدخول',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
@@ -99,7 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     controller: _secondaryPhoneController,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      hintText: 'أدخل رقم هاتف إضافي',
+                      hintText: 'أدخل رقم الهاتف الإضافي',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -121,10 +122,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        'البريد المرتبط: ${_user!.email}',
+                        'الحساب الحالي: ${_user!.email}',
                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                     ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'يمكنك استخدام هذا الرقم لتسجيل الدخول لنفس الحساب.',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
                 ],
               ),
             ),

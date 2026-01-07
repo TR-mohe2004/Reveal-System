@@ -4,9 +4,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:reveal_app/app/data/providers/profile_image_provider.dart'; // مكتبة اختيار الصور
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:reveal_app/app/data/models/user_model.dart';
 import 'package:reveal_app/app/data/models/wallet_model.dart';
+import 'package:reveal_app/app/data/providers/profile_image_provider.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -18,12 +19,13 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoading = true;
+  bool _isSavingProfile = false;
   User? userProfile;
-  WalletModel? userWallet; // نحتاج المحفظة لعرض كود الربط
-  
+  WalletModel? userWallet;
+
   final ApiService _apiService = ApiService();
   final ImagePicker _picker = ImagePicker();
-  File? _localImage; // لحفظ الصورة المختارة محلياً قبل الرفع
+  File? _localImage;
 
   final Color tealColor = const Color(0xFF009688);
   final Color orangeColor = const Color(0xFFFF5722);
@@ -34,19 +36,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _fetchAllData();
   }
 
-  // جلب بيانات المستخدم + بيانات المحفظة
   Future<void> _fetchAllData() async {
     setState(() => isLoading = true);
     try {
-      // 1. جلب البروفايل
       final user = await _apiService.getUserProfile();
-      // 2. جلب المحفظة (عشان كود الربط)
       WalletModel? wallet;
       try {
         wallet = await _apiService.getWallet();
-      } catch (_) {
-        // قد لا يملك محفظة بعد
-      }
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
@@ -61,7 +58,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // دالة اختيار صورة
   Future<void> _pickImage() async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -85,22 +81,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await context.read<ProfileImageProvider>().setPersistentImage(savedImage.path);
 
       if (!mounted) return;
-      // هنا مفروض يتم استدعاء دالة API لرفع الصورة للسيرفر
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("تم حفظ الصورة الجديدة محلياً")),
+        const SnackBar(content: Text("تم حفظ الصورة محلياً")),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("تعذر فتح المعرض: $e")),
+        SnackBar(content: Text("حدث خطأ أثناء اختيار الصورة: $e")),
       );
     }
   }
 
-  // دالة تعديل البيانات (فتح نافذة)
+  Future<void> _saveProfile(String fullName) async {
+    if (_isSavingProfile) return;
+    final name = fullName.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("الاسم مطلوب")),
+      );
+      return;
+    }
+
+    setState(() => _isSavingProfile = true);
+    try {
+      final updatedUser = await _apiService.updateUserProfile(fullName: name);
+      if (!mounted) return;
+      setState(() {
+        userProfile = updatedUser;
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', updatedUser.fullName);
+      await prefs.setString('user_email', updatedUser.email);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم تحديث البيانات بنجاح")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingProfile = false);
+    }
+  }
+
   void _showEditDialog() {
-    final nameController = TextEditingController(text: userProfile?.fullName);
-    final phoneController = TextEditingController(text: userProfile?.phoneNumber);
+    final nameController = TextEditingController(text: userProfile?.fullName ?? '');
+    final phoneValue = userProfile?.phoneNumber ?? '';
 
     showDialog(
       context: context,
@@ -115,9 +144,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 10),
             TextField(
-              controller: phoneController,
+              controller: TextEditingController(text: phoneValue),
+              enabled: false,
               decoration: const InputDecoration(labelText: "رقم الهاتف", prefixIcon: Icon(Icons.phone)),
-              keyboardType: TextInputType.phone,
             ),
           ],
         ),
@@ -126,11 +155,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: tealColor),
             onPressed: () {
-              // هنا استدعاء API لتحديث البيانات
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("تم تحديث البيانات بنجاح (محاكاة)")),
-              );
+              _saveProfile(nameController.text);
             },
             child: const Text("حفظ"),
           ),
@@ -140,15 +166,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     const defaultImage = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
-    // صورة خلفية جمالية
-    const headerImage = "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&q=80"; 
+    const headerImage = "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&q=80";
 
     final persistedPath = context.watch<ProfileImageProvider>().localPath;
     final localPath = _localImage?.path ?? persistedPath;
@@ -166,15 +186,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final rawJoined = userProfile?.dateJoined;
     if (rawJoined != null && rawJoined.trim().isNotEmpty) {
       final parsed = DateTime.tryParse(rawJoined);
-      joinedDate = parsed != null ? DateFormat('yyyy-MM-dd').format(parsed) : rawJoined;
+      joinedDate = parsed != null ? DateFormat('yyyy/MM/dd').format(parsed) : rawJoined;
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // خلفية فاتحة جداً
-      
-      // لا نحتاج AppBar لأننا سنستخدم تصميم Stack مخصص
-      // ولكن لكي يظهر زر القائمة، سنضعه فوق الصورة
-      
+      backgroundColor: Colors.grey[50],
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: tealColor))
           : userProfile == null
@@ -182,12 +198,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               : SingleChildScrollView(
                   child: Column(
                     children: [
-                      // --- 1. الهيدر والصورة ---
                       Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
-                          // خلفية الهيدر
                           Container(
                             height: 200,
                             width: double.infinity,
@@ -196,7 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
                             ),
                           ),
-                          // طبقة شفافة فوق الخلفية
                           Container(
                             height: 200,
                             decoration: BoxDecoration(
@@ -204,18 +217,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
                             ),
                           ),
-                          
-                          // زر القائمة الجانبية (Custom AppBar)
-                          Positioned(
+                          const Positioned(
                             top: 40,
                             left: 16,
-                            child: const Text(
-                              "حسابي",
+                            child: Text(
+                              "الملف الشخصي",
                               style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                             ),
                           ),
-
-                          // صورة البروفايل مع زر التعديل
                           Positioned(
                             bottom: -50,
                             child: Stack(
@@ -228,7 +237,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     backgroundImage: profileImage,
                                   ),
                                 ),
-                                // أيقونة الكاميرا لتغيير الصورة
                                 Positioned(
                                   bottom: 0,
                                   right: 0,
@@ -250,10 +258,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: 60), // مسافة عشان الصورة النازلة
-
-                      // --- 2. الإسم والبريد ---
+                      const SizedBox(height: 60),
                       Text(
                         userProfile!.fullName,
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
@@ -262,16 +267,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         userProfile!.email,
                         style: TextStyle(color: Colors.grey[600], fontSize: 14),
                       ),
-
                       const SizedBox(height: 20),
-
-                      // --- 3. زر تعديل البيانات ---
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 40),
                         child: ElevatedButton.icon(
                           onPressed: _showEditDialog,
                           icon: const Icon(Icons.edit, size: 18),
-                          label: const Text("تعديل الملف الشخصي"),
+                          label: const Text("تعديل البيانات"),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: tealColor,
@@ -282,15 +284,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
-                      // --- 4. البطاقات (المعلومات وكود المحفظة) ---
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Column(
                           children: [
-                            // كرت كود الربط (المهم جداً)
                             if (userWallet != null)
                               Container(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -306,7 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Text("كود المحفظة (للشحن)", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                        const Text("رمز المحفظة (للربط)", style: TextStyle(color: Colors.white70, fontSize: 12)),
                                         const SizedBox(height: 4),
                                         SelectableText(
                                           userWallet!.linkCode.isEmpty ? "---" : userWallet!.linkCode,
@@ -322,25 +320,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ],
                                 ),
                               ),
-
-                            // باقي المعلومات
                             _buildInfoCard("رقم الهاتف", userProfile!.phoneNumber, Icons.phone_android),
-                            _buildInfoCard("الكلية", "كلية تقنية المعلومات", Icons.school), // يمكن جلبها من المودل لاحقاً
+                            _buildInfoCard("الجامعة", "الجامعة الأسمرية", Icons.school),
                             _buildInfoCard("تاريخ الانضمام", joinedDate, Icons.calendar_today),
                           ],
                         ),
                       ),
-                      
                       const SizedBox(height: 30),
                     ],
                   ),
                 ),
-      
-      // القائمة الجانبية (نفس الموجودة في MainScreen)
     );
   }
 
-  // تصميم الكارت الصغير
   Widget _buildInfoCard(String label, String value, IconData icon) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

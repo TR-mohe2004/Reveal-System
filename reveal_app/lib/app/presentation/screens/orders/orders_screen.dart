@@ -1,11 +1,13 @@
-﻿import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:intl/intl.dart' as intl;
+import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:reveal_app/app/core/utils/smart_image_util.dart'; // استيراد الحيلة الذكية
+import 'package:intl/intl.dart' as intl;
+import 'package:provider/provider.dart';
+import 'package:reveal_app/app/core/utils/smart_image_util.dart';
 import 'package:reveal_app/app/data/models/order_model.dart';
-import 'package:reveal_app/app/data/services/api_service.dart';
+import 'package:reveal_app/app/data/providers/cart_provider.dart';
+import 'package:reveal_app/app/data/providers/navigation_provider.dart';
 import 'package:reveal_app/app/data/providers/notification_provider.dart';
+import 'package:reveal_app/app/data/services/api_service.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -17,8 +19,7 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   bool isLoading = true;
   List<OrderModel> myOrders = [];
-  
-  // الألوان الرسمية
+
   final Color tealColor = const Color(0xFF009688);
   final Color orangeColor = const Color(0xFFFF5722);
 
@@ -54,7 +55,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  // تحديد ستايل الحالة وأيقونتها
   Map<String, dynamic> getStatusStyle(String status) {
     switch (status.toUpperCase()) {
       case 'SUCCESS':
@@ -64,23 +64,66 @@ class _OrdersScreenState extends State<OrdersScreen> {
       case 'PREPARING':
         return {"color": Colors.orange, "text": "طلبك قيد التحضير", "bg": Colors.orange.withOpacity(0.1)};
       case 'CANCELLED':
-        return {"color": Colors.red, "text": "تم الإلغاء", "bg": Colors.red.withOpacity(0.1)};
+        return {"color": Colors.red, "text": "تم إلغاء الطلب", "bg": Colors.red.withOpacity(0.1)};
       case 'PENDING':
         return {"color": Colors.grey, "text": "بانتظار الموافقة", "bg": Colors.grey.withOpacity(0.1)};
       case 'ACCEPTED':
-        return {"color": Colors.blue, "text": "تم قبول طلبك بنجاح", "bg": Colors.blue.withOpacity(0.1)};
+        return {"color": Colors.blue, "text": "تم قبول طلبك", "bg": Colors.blue.withOpacity(0.1)};
       default:
-        return {"color": Colors.grey, "text": "حالة غير معروفة", "bg": Colors.grey.withOpacity(0.1)};
+        return {"color": Colors.grey, "text": "قيد المعالجة", "bg": Colors.grey.withOpacity(0.1)};
     }
+  }
+
+  Future<void> _handleReorder(OrderModel order) async {
+    if (order.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("لا توجد عناصر لإعادة الطلب.")),
+      );
+      return;
+    }
+
+    final cart = context.read<CartProvider>();
+    final orderCafeId = order.cafeId ?? '';
+    if (orderCafeId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تعذر تحديد المقهى لهذا الطلب.")),
+      );
+      return;
+    }
+
+    if (cart.items.isNotEmpty) {
+      final existingCafeId = cart.items.values.first.collegeId;
+      if (existingCafeId.isNotEmpty && existingCafeId != orderCafeId) {
+        final shouldClear = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("تبديل السلة؟"),
+            content: const Text("السلة تحتوي على عناصر من مقهى آخر. هل تريد مسحها وإعادة الطلب؟"),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("نعم")),
+            ],
+          ),
+        );
+        if (shouldClear != true) {
+          return;
+        }
+        cart.clear();
+      }
+    }
+
+    cart.replaceWithOrder(order);
+    if (!mounted) return;
+    context.read<NavigationProvider>().setIndex(1);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("تمت إضافة الطلب إلى السلة.")),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // 1. حذفنا Scaffold و AppBar لأن MainScreen تتحكم فيهم
-    // نبدأ مباشرة بـ Column أو Container
     return Column(
       children: [
-        // --- قائمة الطلبات ---
         Expanded(
           child: isLoading
               ? Center(child: CircularProgressIndicator(color: tealColor))
@@ -102,7 +145,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // تصميم الحالة الفارغة
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -115,23 +157,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
             style: TextStyle(fontSize: 18, color: Colors.grey[600], fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          const Text("اطلب أكلتك المفضلة الآن واستمتع!", style: TextStyle(color: Colors.grey)),
+          const Text("ابدأ بطلب منتجاتك المفضلة!", style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
   }
 
-  // --- تصميم بطاقة الطلب (محسن جداً) ---
   Widget _buildOrderCard(OrderModel order) {
     final statusData = getStatusStyle(order.status);
-    
+
     DateTime orderDate;
     try {
       orderDate = DateTime.parse(order.createdAt);
     } catch (_) {
       orderDate = DateTime.now();
     }
-    // تنسيق الوقت ليكون مقروءاً (مثال: منذ 5 دقائق)
     String dateStr;
     try {
       dateStr = intl.DateFormat('d MMM, hh:mm a', 'ar').format(orderDate);
@@ -154,7 +194,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
       child: Column(
         children: [
-          // 1. رأس البطاقة (اسم الكلية والحالة)
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -175,7 +214,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.displayCafeName.isNotEmpty ? order.displayCafeName : (order.cafeName ?? "مقهى الكلية"), // ✅ الاسم الحقيقي للمقهى
+                          order.displayCafeName.isNotEmpty ? order.displayCafeName : "مقهى غير محدد",
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Text(
@@ -204,10 +243,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
           ),
-
           const Divider(height: 1, thickness: 0.5),
-
-          // 2. محتوى الطلب (صور المنتجات باستخدام الحيلة الذكية)
           if (order.items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -219,13 +255,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   separatorBuilder: (ctx, i) => const SizedBox(width: 10),
                   itemBuilder: (context, i) {
                     final item = order.items[i];
-                    // ✅ استخدام الحيلة الذكية لجلب الصورة
-                    // نفترض أن item يحتوي على productName، وإذا لم يوجد نستخدم اسم "منتج"
-                    // ملاحظة: تأكد أن OrderItemModel يحتوي على حقل لاسم المنتج
-                    // هنا سنفترض أن item.productImage يأتي من السيرفر، وإذا لا نستخدم الاسم
                     final imgPath = SmartImageUtil.getImagePath(
-                      item.productName ?? "burger", // استخدم اسم المنتج هنا
-                      item.productImage
+                      item.productName,
+                      item.productImage,
                     );
                     final isNetwork = SmartImageUtil.isNetworkImage(imgPath);
 
@@ -246,7 +278,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 : Image.asset(imgPath, fit: BoxFit.cover),
                           ),
                         ),
-                        // دائرة الكمية
                         Positioned(
                           bottom: 0,
                           right: 0,
@@ -268,7 +299,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 ),
               ),
             ),
-
           if (order.items.any((item) => item.options.isNotEmpty))
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -283,8 +313,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     .toList(),
               ),
             ),
-
-          // 3. الفوتر (السعر وزر إعادة الطلب)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -309,12 +337,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ],
                 ),
                 ElevatedButton.icon(
-                  onPressed: () {
-                    // ميزة مستقبلية: إعادة الطلب
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("سيتم تفعيل ميزة إعادة الطلب قريباً")),
-                    );
-                  },
+                  onPressed: () => _handleReorder(order),
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text("اطلب مرة أخرى"),
                   style: ElevatedButton.styleFrom(

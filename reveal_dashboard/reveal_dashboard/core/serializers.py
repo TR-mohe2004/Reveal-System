@@ -20,7 +20,15 @@ def _build_image_url(image_value, request=None):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'full_name', 'phone_number', 'secondary_phone_number', 'profile_image_url']
+        fields = [
+            'id',
+            'email',
+            'full_name',
+            'phone_number',
+            'secondary_phone_number',
+            'profile_image_url',
+            'date_joined',
+        ]
 
 
 class CafeSerializer(serializers.ModelSerializer):
@@ -102,11 +110,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
     product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), source='product')
     product_name = serializers.ReadOnlyField(source='product.name')
     product_price = serializers.ReadOnlyField(source='product.price')
+    price = serializers.ReadOnlyField()
     product_image = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
-        fields = ['product_id', 'product_name', 'product_price', 'product_image', 'quantity', 'options']
+        fields = ['product_id', 'product_name', 'product_price', 'price', 'product_image', 'quantity', 'options']
 
     def get_product_image(self, obj):
         request = self.context.get('request')
@@ -116,6 +125,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     cafe_name = serializers.ReadOnlyField(source='cafe.name')
+    cafe_id = serializers.ReadOnlyField(source='cafe.id')
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
 
@@ -124,5 +134,5 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_number', 'total_price', 'status', 'status_display',
             'payment_method', 'payment_method_display', 'created_at',
-            'cafe_name', 'items'
+            'cafe_name', 'cafe_id', 'items'
         ]

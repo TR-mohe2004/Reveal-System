@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reveal_app/app/data/models/college_model.dart';
-import 'package:reveal_app/app/data/models/product_model.dart'; // ضروري للسلة
+import 'package:reveal_app/app/data/models/product_model.dart';
+import 'package:reveal_app/app/data/providers/cart_provider.dart';
 import 'package:reveal_app/app/data/providers/college_provider.dart';
 import 'package:reveal_app/app/data/services/api_service.dart';
-import 'package:reveal_app/app/data/providers/cart_provider.dart'; // تأكد من وجود هذا الملف
 
-// --- 2. الشاشة الرئيسية الحية ---
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -64,7 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ],
   };
 
-  
   String userName = "جاري التحميل...";
   String location = "جاري تحديد المقهى...";
 
@@ -72,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final Color orangeColor = const Color(0xFFFF5722);
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = "all";
+  String _searchQuery = '';
 
   final ApiService _apiService = ApiService();
 
@@ -115,7 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // دالة جلب البيانات الحقيقية (المستخدم + المنتجات)
   Future<void> _fetchRealData() async {
     try {
       try {
@@ -165,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           allProducts = filtered.isNotEmpty ? filtered : productsData;
-          displayedProducts = List.from(allProducts);
+          displayedProducts = _applyFilters();
           isLoading = false;
         });
       }
@@ -189,6 +187,8 @@ class _HomeScreenState extends State<HomeScreen> {
       selectedCafeId = cafe.id;
       location = _normalizeCafeName(cafe.name);
       _selectedCategory = 'all';
+      _searchQuery = '';
+      _searchController.clear();
       isLoading = true;
     });
     _fetchProductsForCafe(cafe.id);
@@ -199,10 +199,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (text.contains('pizza') || text.contains('بيتزا')) {
       return 'pizza';
     }
-    if (text.contains('burger') || text.contains('burg') || text.contains('برغر') || text.contains('برجر')) {
+    if (text.contains('burger') || text.contains('برغر') || text.contains('برجر')) {
       return 'burger';
     }
-    if (text.contains('dessert') || text.contains('sweet') || text.contains('حلويات') || text.contains('حلوى') || text.contains('حلى')) {
+    if (text.contains('dessert') || text.contains('sweet') || text.contains('حلويات') || text.contains('حلو')) {
       return 'dessert';
     }
     if (text.contains('drink') ||
@@ -210,10 +210,9 @@ class _HomeScreenState extends State<HomeScreen> {
         text.contains('juice') ||
         text.contains('مشروب') ||
         text.contains('مشروبات') ||
-        text.contains('عصير') ||
         text.contains('قهوة') ||
-        text.contains('ماء') ||
-        text.contains('مياه')) {
+        text.contains('عصير') ||
+        text.contains('ماء')) {
       return 'drink';
     }
     return 'other';
@@ -223,27 +222,34 @@ class _HomeScreenState extends State<HomeScreen> {
     return allProducts.where((p) => _categoryKeyFor(p) == key).take(5).toList();
   }
 
+  List<ProductModel> _applyFilters() {
+    Iterable<ProductModel> filtered = allProducts;
+    if (_selectedCategory != "all") {
+      filtered = filtered.where((p) => _categoryKeyFor(p) == _selectedCategory);
+    }
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filtered = filtered.where((p) =>
+          p.name.toLowerCase().contains(query) ||
+          p.category.toLowerCase().contains(query));
+    }
+    return filtered.toList();
+  }
+
   void _runSearch(String keyword) {
     setState(() {
-      displayedProducts = allProducts.where((p) =>
-        p.name.toLowerCase().contains(keyword.toLowerCase()) || 
-        p.category.toLowerCase().contains(keyword.toLowerCase())
-      ).toList();
+      _searchQuery = keyword.trim();
+      displayedProducts = _applyFilters();
     });
   }
 
   void _filterByCategory(String key) {
     setState(() {
       _selectedCategory = key;
-      if (key == "all") {
-        displayedProducts = List.from(allProducts);
-      } else {
-        displayedProducts = allProducts.where((p) => _categoryKeyFor(p) == key).toList();
-      }
+      displayedProducts = _applyFilters();
     });
   }
 
-  // --- نافذة إضافة للسلة (التفاعلية) ---
   void _showAddToCartSheet(ProductModel product) {
     int quantity = 1;
     showModalBottomSheet(
@@ -261,7 +267,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 10),
                   Text("${product.price} د.ل", style: TextStyle(color: tealColor, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 20),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -284,15 +289,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: tealColor, padding: const EdgeInsets.symmetric(vertical: 12)),
                       onPressed: () {
-                        // --- إضافة للسلة الحقيقية ---
-                        // تأكد من أنك قمت بعمل Provide لـ CartProvider في main.dart
                         try {
-                          // هذا السطر يتطلب تعديل CartProvider ليقبل ProductModel
                           context.read<CartProvider>().addItem(product, quantity: quantity);
-                          
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("تمت إضافة $quantity من ${product.name} للسلة ✅")),
+                            SnackBar(content: Text("تمت إضافة $quantity من ${product.name} إلى السلة")),
                           );
                         } on MismatchedCollegeException catch (e) {
                           Navigator.pop(ctx);
@@ -300,16 +301,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             SnackBar(content: Text(e.toString())),
                           );
                         } catch (e) {
-                          print("Cart Error: $e");
+                          debugPrint("Cart Error: $e");
                         }
                       },
-                      child: const Text("إضافة للسلة", style: TextStyle(fontSize: 16)),
+                      child: const Text("إضافة إلى السلة", style: TextStyle(fontSize: 16)),
                     ),
                   )
                 ],
               ),
             );
-          }
+          },
         );
       },
     );
@@ -317,9 +318,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // قائمة المفضلة (اختياري)
     final favorites = allProducts.where((p) => p.isFavorite).toList();
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final showFilteredGrid = _searchQuery.isNotEmpty || _selectedCategory != "all";
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -332,7 +333,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. الرأس (المقهى الحالي)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Row(
@@ -355,10 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 15),
-
-                    // 2. البحث
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Container(
@@ -369,24 +366,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           textAlign: TextAlign.right,
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            hintText: "ابحث عن اسم المنتج...",
+                            hintText: "ابحث عن منتج...",
                             prefixIcon: Icon(Icons.search, color: tealColor),
                             contentPadding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
                     _buildCategoryTiles(),
                     const SizedBox(height: 20),
-
-                    // 3. قسم "المفضلة" (اختياري)
                     if (favorites.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text("المفضلة لديك", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        child: Text("المفضلة", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
                       ),
                       const SizedBox(height: 10),
                       SizedBox(
@@ -400,8 +393,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 20),
                     ],
-
-                    // 5. عرض المنتجات (حسب الفئة)
                     allProducts.isEmpty
                         ? const Center(
                             child: Padding(
@@ -409,17 +400,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Text("لا توجد منتجات حالياً"),
                             ),
                           )
-                        : _selectedCategory == "all"
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildCategorySection('burger', 'برغر'),
-                                  _buildCategorySection('pizza', 'بيتزا'),
-                                  _buildCategorySection('dessert', 'حلويات'),
-                                  _buildCategorySection('drink', 'مشروبات'),
-                                ],
-                              )
-                            : GridView.builder(
+                        : showFilteredGrid
+                            ? GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 padding: const EdgeInsets.all(16),
@@ -435,8 +417,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                   categoryKey: _categoryKeyFor(displayedProducts[index]),
                                   index: index,
                                 ),
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildCategorySection('burger', 'برغر'),
+                                  _buildCategorySection('pizza', 'بيتزا'),
+                                  _buildCategorySection('dessert', 'حلويات'),
+                                  _buildCategorySection('drink', 'مشروبات'),
+                                ],
                               ),
-
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -444,9 +434,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  // --- Widgets ---
-
 
   Widget _buildCategoryTiles() {
     final tiles = [
@@ -696,14 +683,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           try {
                             context.read<CartProvider>().addItem(product);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("تمت إضافة ${product.name} للسلة")),
+                              SnackBar(content: Text("تمت إضافة ${product.name} إلى السلة")),
                             );
                           } on MismatchedCollegeException catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(e.toString())),
                             );
                           } catch (e) {
-                            print("Cart Error: $e");
+                            debugPrint("Cart Error: $e");
                           }
                         },
                         child: Container(

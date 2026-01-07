@@ -100,9 +100,31 @@ def update_secondary_phone(request):
     return Response({'secondary_phone': phone})
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):
+    if request.method == 'GET':
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    full_name = (request.data.get('full_name') or request.data.get('name') or '').strip()
+    profile_image_url = (request.data.get('profile_image_url') or '').strip()
+
+    if not full_name:
+        return Response({'error': 'الاسم مطلوب.'}, status=400)
+
+    update_fields = []
+    if full_name and request.user.full_name != full_name:
+        request.user.full_name = full_name
+        update_fields.append('full_name')
+
+    if 'profile_image_url' in request.data:
+        request.user.profile_image_url = profile_image_url or None
+        update_fields.append('profile_image_url')
+
+    if update_fields:
+        request.user.save(update_fields=update_fields)
+
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 

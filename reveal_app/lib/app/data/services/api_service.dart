@@ -282,6 +282,36 @@ class ApiService {
     }
   }
 
+  Future<app_user.User> updateUserProfile({
+    required String fullName,
+    String? profileImageUrl,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/user/');
+    final payload = <String, dynamic>{
+      'full_name': fullName.trim(),
+      if (profileImageUrl != null) 'profile_image_url': profileImageUrl.trim(),
+    };
+
+    try {
+      final response = await http.patch(
+        url,
+        headers: await _headers(authRequired: true),
+        body: json.encode(payload),
+      );
+      final data = _decodeBody(response);
+
+      if (response.statusCode == 200 && data is Map<String, dynamic>) {
+        return app_user.User.fromJson(data);
+      }
+
+      throw _buildException(response, data);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Network error: $e');
+    }
+  }
+
   Future<bool> transferWallet({
     required String walletCode,
     required double amount,
