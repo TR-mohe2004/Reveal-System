@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileImageProvider extends ChangeNotifier {
-  static const _pathKey = 'profile_temp_path';
+  static const _pathKey = 'profile_image_path';
+  static const _legacyPathKey = 'profile_temp_path';
   static const _expiryKey = 'profile_temp_expiry';
 
   String? _localPath;
@@ -22,7 +23,7 @@ class ProfileImageProvider extends ChangeNotifier {
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString(_pathKey);
+    final path = prefs.getString(_pathKey) ?? prefs.getString(_legacyPathKey);
     final expiryMs = prefs.getInt(_expiryKey);
     if (path == null) return;
 
@@ -35,6 +36,10 @@ class ProfileImageProvider extends ChangeNotifier {
       _expiresAt = expiry;
     } else {
       _expiresAt = null;
+    }
+    if (prefs.getString(_pathKey) == null) {
+      await prefs.setString(_pathKey, path);
+      await prefs.remove(_legacyPathKey);
     }
     _localPath = path;
     notifyListeners();
@@ -62,6 +67,7 @@ class ProfileImageProvider extends ChangeNotifier {
   Future<void> clearTempImage() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_pathKey);
+    await prefs.remove(_legacyPathKey);
     await prefs.remove(_expiryKey);
     _localPath = null;
     _expiresAt = null;

@@ -8,16 +8,13 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  // متغير لتتبع الوضع الحالي (نهاري أو ليلي)
   bool isDarkMode = false;
 
   @override
   Widget build(BuildContext context) {
-    // تحديد الألوان بناءً على الوضع الحالي
     final colors = isDarkMode ? _darkColors : _lightColors;
 
     return Scaffold(
-      // لون الخلفية يتغير مع الوضع
       backgroundColor: colors['background'],
       body: SafeArea(
         child: Padding(
@@ -28,7 +25,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  // ✨ ويدجت بناء المحتوى الرئيسي (لتحسين التنظيم)
   Widget _buildContent(BuildContext context, Map<String, Color> colors) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -47,7 +43,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  // ويدجت الشعار
   Widget _buildLogo(Map<String, Color> colors) {
     return Image.asset(
       'assets/images/logo.png',
@@ -58,12 +53,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  // ويدجت نصوص الترحيب
   Widget _buildWelcomeText(Map<String, Color> colors) {
     return Column(
       children: [
         Text(
-          'أهلاً بكم إلى\nتطبيق ريفيل!',
+          'مرحباً بك في ريفيل',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 32,
@@ -73,7 +67,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ),
         const SizedBox(height: 16),
         Text(
-          'النص الفرعي سيوضع هنا، وهو تجربة عملية لرؤية التطبيق العامة.',
+          'اطلب وجبتك أو مشروبك بسرعة، وتابع حالة طلبك مباشرة من التطبيق.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
@@ -84,7 +78,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  // ويدجت أزرار الدخول وإنشاء الحساب
   Widget _buildAuthButtons(BuildContext context, Map<String, Color> colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -92,9 +85,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ElevatedButton(
           onPressed: () => Navigator.pushNamed(context, '/login'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: colors['loginButton'], // ✨ استخدام لون من الثيم
+            backgroundColor: colors['loginButton'],
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), // ✨ إضافة const ✨
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           ),
           child: const Text(
             'تسجيل الدخول',
@@ -105,9 +98,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ElevatedButton(
           onPressed: () => Navigator.pushNamed(context, '/signup'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: colors['signupButton'], // ✨ استخدام لون من الثيم
+            backgroundColor: colors['signupButton'],
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), // ✨ إضافة const ✨
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           ),
           child: const Text(
             'إنشاء حساب جديد',
@@ -118,12 +111,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  // ويدجت أزرار الإعدادات (الثيم واللغة)
   Widget _buildSettingsButtons(Map<String, Color> colors) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // زر تغيير الوضع
         TextButton.icon(
           onPressed: () => setState(() => isDarkMode = !isDarkMode),
           icon: Icon(
@@ -138,14 +129,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           style: TextButton.styleFrom(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: colors['border'] ?? Colors.grey), // ✨ إضافة const ✨
+              side: BorderSide(color: colors['border'] ?? Colors.grey),
             ),
           ),
         ),
         const SizedBox(width: 16),
-        // زر تغيير اللغة (غير فعال حالياً)
         TextButton.icon(
-          onPressed: () { /* TODO: Implement language change logic */ },
+          onPressed: () {},
           icon: const Icon(Icons.language, size: 20, color: Color(0xFF2DBA9D)),
           label: Text(
             'اللغة: العربية',
@@ -154,7 +144,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           style: TextButton.styleFrom(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: colors['border'] ?? Colors.grey), // ✨ إضافة const ✨
+              side: BorderSide(color: colors['border'] ?? Colors.grey),
             ),
           ),
         ),
@@ -162,24 +152,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  // تعريف مجموعات الألوان (كما هي تماماً)
   static const Map<String, Color> _lightColors = {
     'background': Colors.white,
     'primaryText': Color(0xFF333333),
     'secondaryText': Color(0xFF666666),
-    'icon': Color(0xFFF27E49), // برتقالي
+    'icon': Color(0xFFF27E49),
     'border': Color(0xFFDDDDDD),
-    'loginButton': Color(0xFF2DBA9D), // أخضر
-    'signupButton': Color(0xFFF27E49), // برتقالي
+    'loginButton': Color(0xFF2DBA9D),
+    'signupButton': Color(0xFFF27E49),
   };
 
   static const Map<String, Color> _darkColors = {
     'background': Color(0xFF121212),
     'primaryText': Colors.white,
     'secondaryText': Color(0xFFBBBBBB),
-    'icon': Color(0xFFF27E49), // برتقالي
+    'icon': Color(0xFFF27E49),
     'border': Color(0xFF444444),
-    'loginButton': Color(0xFF2DBA9D), // أخضر
-    'signupButton': Color(0xFFF27E49), // برتقالي
+    'loginButton': Color(0xFF2DBA9D),
+    'signupButton': Color(0xFFF27E49),
   };
 }

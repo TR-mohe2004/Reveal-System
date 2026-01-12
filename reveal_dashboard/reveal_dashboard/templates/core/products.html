@@ -6,17 +6,17 @@
     <div>
         <h1 class="h2">المنتجات</h1>
         {% if cafe_name %}
-            <p class="text-muted mb-0">مقهى المستخدم: {{ cafe_name }}</p>
+            <p class="text-muted mb-0">مقهى: {{ cafe_name }}</p>
         {% endif %}
     </div>
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">
-        <i class="fas fa-plus-circle me-2"></i>إضافة منتج جديد
+        <i class="fas fa-plus-circle me-2"></i>إضافة منتج
     </button>
 </div>
 
 {% if not categories %}
     <div class="alert alert-warning">
-        لا توجد فئات مرتبطة بهذا المقهى. أضف فئات أولاً قبل إضافة منتجات.
+        لا توجد فئات معرفة لهذا المقهى. أضف فئة أولاً أو اختر فئة أثناء إضافة المنتج.
     </div>
 {% endif %}
 
@@ -39,8 +39,8 @@
                         <td class="ps-4">
                             <span class="fw-bold">{{ product.name }}</span>
                         </td>
-                        <td>{{ product.price|floatformat:2 }} د.ل</td>
-                        <td>{{ product.category.name|default:"غير محدد" }}</td>
+                        <td>{{ product.price|floatformat:2 }} {{ system_settings.currency_symbol|default:"د.ل" }}</td>
+                        <td>{{ product.category.name|default:"بدون فئة" }}</td>
                         <td>
                             {% if product.is_available %}
                                 <span class="badge bg-success-soft text-success">متاح</span>
@@ -49,12 +49,19 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{% url 'core:edit_product' product.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
-                            <a href="{% url 'core:delete_product' product.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف المنتج؟');"><i class="fas fa-trash"></i></a>
+                            <a href="{% url 'core:edit_product' product.id %}" class="btn btn-sm btn-outline-primary" title="تعديل">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{% url 'core:delete_product' product.id %}" class="btn btn-sm btn-outline-danger" title="حذف"
+                               onclick="return confirm('هل أنت متأكد من حذف المنتج؟');">
+                                <i class="fas fa-trash"></i>
+                            </a>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5" class="text-center p-5 text-muted">لا توجد منتجات مضافة لهذا المقهى.</td></tr>
+                    <tr>
+                        <td colspan="5" class="text-center p-5 text-muted">لا توجد منتجات مضافة لهذا المقهى.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -74,7 +81,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">اسم المنتج</label>
-                        <input type="text" class="form-control" name="name" placeholder="مثال: بيتزا مارجريتا" required>
+                        <input type="text" class="form-control" name="name" placeholder="مثال: بيتزا مارغريتا" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">الفئة</label>
@@ -86,7 +93,7 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">السعر (د.ل)</label>
+                        <label class="form-label">السعر ({{ system_settings.currency_symbol|default:"د.ل" }})</label>
                         <input type="number" class="form-control" name="price" step="0.01" required>
                     </div>
                     <div class="mb-3">
@@ -95,13 +102,13 @@
                     </div>
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" name="is_available" checked>
-                        <label class="form-check-label">متاح للبيع</label>
+                        <label class="form-check-label">متاح للعرض</label>
                     </div>
-                    <small class="text-muted d-block mt-2">يتم اختيار صورة المنتج تلقائياً داخل التطبيق حسب الفئة.</small>
+                    <small class="text-muted d-block mt-2">يمكنك تعديل المنتج لاحقاً من الجدول.</small>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary">حفظ المنتج</button>
+                    <button type="submit" class="btn btn-primary">إضافة المنتج</button>
                 </div>
             </form>
         </div>

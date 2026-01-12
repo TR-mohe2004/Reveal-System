@@ -1,40 +1,35 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.urls import reverse
-from django.contrib import messages
-from django.conf import settings
-from django.db import transaction
-from django.utils import timezone
-from django.db.models import Q, Sum
 from decimal import Decimal
 import re
 
-# --- DRF Imports ---
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.db.models import Count, Q, Sum
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
 
-# --- Models & Serializers ---
-from .models import Product, Cafe, Category, Order, OrderItem
-from users.models import User
-from wallet.models import Wallet, Transaction
-from .forms import ProductForm
-from .serializers import ProductSerializer, OrderSerializer, UserSerializer, CafeSerializer
-from .utils import normalize_libyan_phone, send_real_notification
 from .api_views import invalidate_products_cache
+from .forms import InventoryItemForm, ProductForm
+from .models import Cafe, Category, InventoryItem, Order, OrderItem, Product, SystemSettings
+from .serializers import CafeSerializer, OrderSerializer, ProductSerializer, UserSerializer
+from .utils import normalize_libyan_phone, send_real_notification
+from users.models import User
+from wallet.models import Transaction, Wallet
 
 DEFAULT_CATEGORY_NAMES = ['برغر', 'بيتزا', 'حلويات', 'مشروبات', 'قهوة']
 
-# --- Helper Functions ---
 
 def get_cafe_for_user(user):
-    """
-    جلب المقهى المرتبط بالمستخدم، أو أول مقهى للأدمن.
-    """
     cafe = getattr(user, 'my_cafe', None)
     if cafe:
         return cafe
@@ -46,17 +41,21 @@ def get_cafe_for_user(user):
             return active_cafes.first()
     return None
 
+
 def ensure_categories_for_cafe(cafe):
-    """
-    التأكد من وجود تصنيفات افتراضية للمقهى.
-    """
-    existing_defaults = set(Category.objects.filter(name__in=DEFAULT_CATEGORY_NAMES).values_list('name', flat=True))
+    existing_defaults = set(
+        Category.objects.filter(name__in=DEFAULT_CATEGORY_NAMES).values_list('name', flat=True)
+    )
     for name in DEFAULT_CATEGORY_NAMES:
         if name not in existing_defaults:
             Category.objects.get_or_create(name=name)
     return Category.objects.filter(
         Q(name__in=DEFAULT_CATEGORY_NAMES) | Q(products__cafe=cafe)
     ).distinct().order_by('name')
+
+
+def get_system_settings():
+    return SystemSettings.get_solo()
 
 
 # =========================================================
@@ -72,37 +71,27 @@ def api_login(request):
     fcm_token = request.data.get('fcm_token')
 
     if not raw_identifier or not password:
-        return Response({'error': 'الهاتف/البريد وكلمة المرور مطلوبة'}, status=400)      
+        return Response({'error': 'رقم الهاتف/البريد وكلمة المرور مطلوبة.'}, status=400)
 
-    # محاولة التطبيع كرقم هاتف
     phone = normalize_libyan_phone(raw_identifier)
-    
     user_obj = None
     if phone:
         user_obj = User.objects.filter(Q(phone_number=phone) | Q(secondary_phone_number=phone)).first()
-    
-    # إذا لم يوجد بالهاتف، نجرب كبريد إلكتروني
+
     if not user_obj and '@' in str(raw_identifier):
         user_obj = User.objects.filter(email__iexact=str(raw_identifier).strip()).first()
 
     if not user_obj:
-        return Response({'error': 'المستخدم غير موجود'}, status=400)
+        return Response({'error': 'الحساب غير موجود.'}, status=400)
 
-    # المصادقة باستخدام الايميل دائماً (لأن Django auth يعتمد عليه في هذا المشروع)
     user = authenticate(request, username=user_obj.email, password=password)
-    
     if user:
-        # تحديث توكن الإشعارات
         if fcm_token and hasattr(user, 'fcm_token'):
             user.fcm_token = fcm_token
             user.save(update_fields=['fcm_token'])
 
         token, _ = Token.objects.get_or_create(user=user)
-        
-        # جلب رصيد المحفظة بأمان
-        balance = 0
-        if hasattr(user, 'wallet'):
-            balance = user.wallet.balance
+        balance = user.wallet.balance if hasattr(user, 'wallet') else 0
 
         return Response({
             'token': token.key,
@@ -111,11 +100,11 @@ def api_login(request):
                 'phone_number': user.phone_number,
                 'full_name': user.full_name,
                 'email': user.email,
-                'wallet_balance': balance
-            }
+                'wallet_balance': balance,
+            },
         })
 
-    return Response({'error': 'كلمة المرور غير صحيحة'}, status=400)
+    return Response({'error': 'بيانات الدخول غير صحيحة.'}, status=400)
 
 
 @csrf_exempt
@@ -129,13 +118,13 @@ def api_signup(request):
 
     phone_number = normalize_libyan_phone(raw_phone)
     if not phone_number or not re.fullmatch(r'09\d{8}', phone_number):
-        return Response({'error': 'رقم الهاتف غير صالح (الصيغة الصحيحة: 09XXXXXXXX)'}, status=400)
+        return Response({'error': 'رقم الهاتف غير صحيح (مثال: 09XXXXXXXX).'}, status=400)
 
     if not password:
-        return Response({'error': 'كلمة المرور مطلوبة'}, status=400)
+        return Response({'error': 'كلمة المرور مطلوبة.'}, status=400)
 
     if User.objects.filter(phone_number=phone_number).exists():
-        return Response({'error': 'رقم الهاتف مسجّل سابقاً'}, status=400)
+        return Response({'error': 'رقم الهاتف مسجل مسبقاً.'}, status=400)
 
     if not email:
         email = f"{phone_number}@auto.local"
@@ -145,19 +134,22 @@ def api_signup(request):
             phone_number=phone_number,
             password=password,
             full_name=full_name or phone_number,
-            email=email
+            email=email,
         )
-        # إنشاء محفظة تلقائياً (Signals should handle this, but for safety)
         if not hasattr(user, 'wallet'):
-             Wallet.objects.create(user=user)
+            Wallet.objects.create(user=user)
 
         token, _ = Token.objects.get_or_create(user=user)
         return Response({
             'token': token.key,
-            'user': {'phone_number': user.phone_number, 'full_name': user.full_name, 'email': user.email}
+            'user': {
+                'phone_number': user.phone_number,
+                'full_name': user.full_name,
+                'email': user.email,
+            },
         }, status=201)
-    except Exception as e:
-        return Response({'error': str(e)}, status=400)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=400)
 
 
 @api_view(['GET'])
@@ -172,8 +164,6 @@ def get_cafes_list(request):
 @permission_classes([AllowAny])
 def get_products(request):
     cafe_id = request.GET.get('cafe_id')
-    
-    # منطق افتراضي: إذا لم يحدد مقهى، نرجع الأول
     if not cafe_id:
         first_cafe = Cafe.objects.filter(is_active=True).first()
         if first_cafe:
@@ -182,7 +172,6 @@ def get_products(request):
             return Response([])
 
     products = Product.objects.select_related('cafe', 'category').filter(cafe_id=cafe_id).order_by('-created_at')
-
     category_id = request.GET.get('category_id')
     category_name = request.GET.get('category') or request.GET.get('category_name')
     available_only = request.GET.get('available')
@@ -209,24 +198,21 @@ def get_user_profile(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_order(request):
-    """
-    ????? ????? ?? ??? ????? ??? ??????? ?? ???.
-    """
     user = request.user
     total_price_raw = request.data.get('total_price')
     items_data = request.data.get('items')
     payment_method = 'WALLET'
 
     if total_price_raw is None or not items_data:
-        return Response({'error': '???? ????? ????? ?????????.'}, status=400)
+        return Response({'error': 'بيانات الطلب ناقصة.'}, status=400)
 
     if len(items_data) == 0:
-        return Response({'error': '????? ?????.'}, status=400)
+        return Response({'error': 'لا توجد عناصر في الطلب.'}, status=400)
 
     try:
         total_price = Decimal(str(total_price_raw))
     except Exception:
-        return Response({'error': 'Invalid total_price'}, status=400)
+        return Response({'error': 'قيمة الطلب غير صحيحة.'}, status=400)
 
     try:
         with transaction.atomic():
@@ -234,28 +220,28 @@ def create_order(request):
             products = list(Product.objects.filter(id__in=product_ids).select_related('cafe'))
 
             if len(products) != len(set(product_ids)):
-                return Response({'error': '???? ??? ?????.'}, status=400)
+                return Response({'error': 'بعض المنتجات غير موجودة.'}, status=400)
 
-            cafes = {p.cafe_id for p in products}
+            cafes = {product.cafe_id for product in products}
             if len(cafes) != 1:
-                return Response({'error': '??? ?? ???? ???? ???????? ?? ??? ??????.'}, status=400)
+                return Response({'error': 'لا يمكن طلب منتجات من أكثر من مقهى في نفس الطلب.'}, status=400)
             target_cafe_id = cafes.pop()
 
             if payment_method == 'WALLET':
                 try:
                     wallet = Wallet.objects.select_for_update().get(user=user)
                 except Wallet.DoesNotExist:
-                    return Response({'error': '??????? ??? ??????.'}, status=404)
+                    return Response({'error': 'المحفظة غير موجودة.'}, status=404)
 
                 if wallet.balance < total_price:
-                    return Response({'error': '???? ??????? ??? ????.'}, status=400)
+                    return Response({'error': 'رصيد المحفظة غير كافٍ.'}, status=400)
 
                 Transaction.objects.create(
                     wallet=wallet,
                     amount=total_price,
                     transaction_type='WITHDRAWAL',
                     source='APP',
-                    description='??? ????'
+                    description='خصم طلب',
                 )
 
             new_order = Order.objects.create(
@@ -263,7 +249,7 @@ def create_order(request):
                 cafe_id=target_cafe_id,
                 total_price=total_price,
                 status='PENDING',
-                payment_method=payment_method
+                payment_method=payment_method,
             )
 
             for item in items_data:
@@ -272,7 +258,7 @@ def create_order(request):
                 product = next((p for p in products if str(p.id) == str(product_id)), None)
 
                 if not product:
-                    return Response({'error': '???? ??? ?????.'}, status=400)
+                    return Response({'error': 'منتج غير موجود.'}, status=400)
 
                 options = item.get('options') or item.get('note') or ''
                 OrderItem.objects.create(
@@ -280,19 +266,19 @@ def create_order(request):
                     product=product,
                     quantity=qty,
                     price=product.price,
-                    options=options
+                    options=options,
                 )
 
         try:
-            send_real_notification(user, "?? ?????? ????", f"???? #{new_order.order_number} ??? ????????.")
+            send_real_notification(user, "تم استلام طلبك", f"طلبك #{new_order.order_number} قيد المراجعة.")
         except Exception:
             pass
 
-        return Response({'message': '?? ????? ????? ?????', 'order_id': new_order.id}, status=201)
+        return Response({'message': 'تم إرسال الطلب بنجاح', 'order_id': new_order.id}, status=201)
 
-    except Exception as e:
-        print(f"Order Error: {e}")
-        return Response({'error': '??? ??? ????? ????? ?????.'}, status=500)
+    except Exception:
+        return Response({'error': 'حدث خطأ أثناء إنشاء الطلب.'}, status=500)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -329,22 +315,19 @@ def custom_login(request):
 
         phone = normalize_libyan_phone(username)
         user_obj = User.objects.filter(Q(phone_number=phone) | Q(secondary_phone_number=phone)).first()
-        # Fallback to checking email if phone fails
         if not user_obj:
-             user_obj = User.objects.filter(email__iexact=username).first()
+            user_obj = User.objects.filter(email__iexact=username).first()
 
         email_for_auth = user_obj.email if user_obj else username
-
         user = authenticate(request, username=email_for_auth, password=password)
 
         if user:
             login(request, user)
             return redirect('core:dashboard')
-        else:
-            return render(request, 'login.html', {
-                'error': 'بيانات الدخول غير صحيحة',
-                'prefill_username': username or prefill_username,
-            })
+        return render(request, 'login.html', {
+            'error': 'بيانات الدخول غير صحيحة.',
+            'prefill_username': username or prefill_username,
+        })
 
     return render(request, 'login.html', {'prefill_username': prefill_username})
 
@@ -367,9 +350,7 @@ def switch_cafe(request, cafe_id):
 
 @login_required(login_url='core:login')
 def dashboard(request):
-    # ???? ?????? ????????: ???? ?????????? + ???????? ???????
     cafe = get_cafe_for_user(request.user)
-
     products_count = 0
     orders_count = 0
     products_list = []
@@ -390,7 +371,7 @@ def dashboard(request):
         'total_cafes': Cafe.objects.count() if request.user.is_superuser else (1 if cafe else 0),
         'total_wallets': wallets_count,
         'user': request.user,
-        'cafe_name': cafe.name if cafe else "???? ??????? ??????",
+        'cafe_name': cafe.name if cafe else "لا يوجد مقهى مرتبط",
         'products': products_list,
     }
     return render(request, 'core/dashboard.html', context)
@@ -399,10 +380,14 @@ def dashboard(request):
 @login_required(login_url='core:login')
 def products(request):
     cafe = get_cafe_for_user(request.user)
+    system_settings = get_system_settings()
 
     if not cafe:
         return render(request, 'core/products.html', {
-            'products': [], 'categories': [], 'cafe_name': "?? ???? ???? ????"
+            'products': [],
+            'categories': [],
+            'cafe_name': "لا يوجد مقهى مرتبط",
+            'system_settings': system_settings,
         })
 
     categories = ensure_categories_for_cafe(cafe)
@@ -412,12 +397,14 @@ def products(request):
         'products': products_qs,
         'categories': categories,
         'cafe_name': cafe.name,
+        'system_settings': system_settings,
     })
 
 
 @login_required(login_url='core:login')
 def orders(request):
     cafe = get_cafe_for_user(request.user)
+    system_settings = get_system_settings()
 
     if request.user.is_superuser:
         all_orders = Order.objects.all().order_by('-created_at')
@@ -428,6 +415,7 @@ def orders(request):
             'accepted_orders': [],
             'preparing_orders': [],
             'ready_orders': [],
+            'system_settings': system_settings,
         })
     else:
         all_orders = Order.objects.filter(cafe=cafe).order_by('-created_at')
@@ -438,13 +426,22 @@ def orders(request):
         'accepted_orders': all_orders.filter(status='ACCEPTED'),
         'preparing_orders': all_orders.filter(status='PREPARING'),
         'ready_orders': all_orders.filter(status='READY'),
+        'system_settings': system_settings,
     }
     return render(request, 'core/orders.html', context)
 
 
 @login_required(login_url='core:login')
 def customers(request):
-    users_qs = User.objects.all().order_by('-date_joined')
+    cafe = get_cafe_for_user(request.user)
+
+    if cafe and not request.user.is_superuser:
+        users_qs = User.objects.filter(orders__cafe=cafe).distinct()
+        users_qs = users_qs.annotate(orders_count=Count('orders', filter=Q(orders__cafe=cafe)))
+    else:
+        users_qs = User.objects.all().annotate(orders_count=Count('orders'))
+
+    users_qs = users_qs.order_by('-date_joined')
     users = []
     for user in users_qs:
         if user.is_superuser:
@@ -454,17 +451,88 @@ def customers(request):
         else:
             role = 'customer'
         users.append({
+            'full_name': user.full_name,
             'email': user.email,
+            'phone_number': user.phone_number,
             'role': role,
             'created_at': user.date_joined,
+            'orders_count': getattr(user, 'orders_count', 0),
             'uid': user.id,
         })
-    return render(request, 'core/customers.html', {'users': users})
+
+    return render(request, 'core/customers.html', {
+        'users': users,
+        'cafe_name': cafe.name if cafe else None,
+    })
 
 
 @login_required(login_url='core:login')
 def stock(request):
-    return render(request, 'core/stock.html')
+    cafe = get_cafe_for_user(request.user)
+    if not cafe:
+        messages.error(request, "لا يوجد مقهى مرتبط لهذا الحساب.")
+        return redirect('core:dashboard')
+
+    items = InventoryItem.objects.filter(cafe=cafe).order_by('name')
+    form = InventoryItemForm()
+    system_settings = get_system_settings()
+
+    return render(request, 'core/stock.html', {
+        'items': items,
+        'form': form,
+        'cafe_name': cafe.name,
+        'system_settings': system_settings,
+    })
+
+
+@login_required(login_url='core:login')
+def add_inventory_item(request):
+    cafe = get_cafe_for_user(request.user)
+    if not cafe:
+        messages.error(request, "لا يوجد مقهى مرتبط لهذا الحساب.")
+        return redirect('core:stock')
+
+    if request.method == 'POST':
+        form = InventoryItemForm(request.POST)
+        if form.is_valid():
+            item = form.save(commit=False)
+            item.cafe = cafe
+            item.save()
+            messages.success(request, "تم إضافة الصنف للمخزون بنجاح.")
+        else:
+            messages.error(request, "تعذر إضافة الصنف. تأكد من البيانات.")
+    return redirect('core:stock')
+
+
+@login_required(login_url='core:login')
+def edit_inventory_item(request, item_id):
+    cafe = get_cafe_for_user(request.user)
+    if not cafe:
+        return redirect('core:stock')
+
+    item = get_object_or_404(InventoryItem, id=item_id, cafe=cafe)
+    if request.method == 'POST':
+        form = InventoryItemForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تحديث بيانات المخزون بنجاح.")
+            return redirect('core:stock')
+        messages.error(request, "تعذر تحديث البيانات. تأكد من الحقول.")
+
+    return render(request, 'core/stock_edit.html', {
+        'item': item,
+        'form': InventoryItemForm(instance=item),
+        'cafe_name': cafe.name,
+    })
+
+
+@login_required(login_url='core:login')
+def delete_inventory_item(request, item_id):
+    cafe = get_cafe_for_user(request.user)
+    if cafe:
+        InventoryItem.objects.filter(id=item_id, cafe=cafe).delete()
+        messages.success(request, "تم حذف الصنف من المخزون.")
+    return redirect('core:stock')
 
 
 @login_required(login_url='core:login')
@@ -520,7 +588,36 @@ def reports(request):
 
 @login_required(login_url='core:login')
 def settings_page(request):
-    return render(request, 'core/settings.html')
+    system_settings = get_system_settings()
+
+    if request.method == 'POST':
+        system_name = (request.POST.get('system_name') or '').strip()
+        welcome_message = (request.POST.get('welcome_message') or '').strip()
+        currency_symbol = (request.POST.get('currency_symbol') or '').strip()
+        allow_registration = bool(request.POST.get('allow_registration'))
+        min_charge_raw = request.POST.get('min_charge_amount') or system_settings.min_charge_amount
+
+        try:
+            min_charge_amount = Decimal(str(min_charge_raw))
+        except Exception:
+            messages.error(request, "قيمة الحد الأدنى للشحن غير صحيحة.")
+            return redirect('core:settings')
+
+        if system_name:
+            system_settings.system_name = system_name
+        if welcome_message:
+            system_settings.welcome_message = welcome_message
+        if currency_symbol:
+            system_settings.currency_symbol = currency_symbol
+
+        system_settings.min_charge_amount = min_charge_amount
+        system_settings.allow_registration = allow_registration
+        system_settings.save()
+
+        messages.success(request, "تم حفظ إعدادات النظام بنجاح.")
+        return redirect('core:settings')
+
+    return render(request, 'core/settings.html', {'settings': system_settings})
 
 
 @login_required(login_url='core:login')
@@ -533,20 +630,21 @@ def wallet_list(request):
 def wallet_recharge(request):
     search_query = request.GET.get('q', '').strip()
     wallets = Wallet.objects.select_related('user').all().order_by('-updated_at')
+    system_settings = get_system_settings()
 
     if search_query:
         wallets = wallets.filter(
-            Q(user__full_name__icontains=search_query) |
-            Q(user__email__icontains=search_query) |
-            Q(user__phone_number__icontains=search_query) |
-            Q(link_code__icontains=search_query)
+            Q(user__full_name__icontains=search_query)
+            | Q(user__email__icontains=search_query)
+            | Q(user__phone_number__icontains=search_query)
+            | Q(link_code__icontains=search_query)
         )
 
-    context = {
+    return render(request, 'core/wallet_recharge.html', {
         'wallets': wallets,
-        'min_charge_amount': getattr(settings, 'MIN_CHARGE_AMOUNT', 1.0),
-    }
-    return render(request, 'core/wallet_recharge.html', context)
+        'min_charge_amount': system_settings.min_charge_amount,
+        'system_settings': system_settings,
+    })
 
 
 @login_required(login_url='core:login')
@@ -554,40 +652,33 @@ def wallet_history(request):
     return render(request, 'core/wallet_history.html')
 
 
-# --- Actions ---
-
 @login_required(login_url='core:login')
 def add_product(request):
     my_cafe = get_cafe_for_user(request.user)
     if not my_cafe:
-        messages.error(request, "لا يوجد مقهى لربط المنتج به.")
+        messages.error(request, "لا يوجد مقهى مرتبط لهذا الحساب.")
         return redirect('core:products')
 
-    # Get Categories
     categories_qs = ensure_categories_for_cafe(my_cafe)
 
     if request.method == 'POST':
         form = ProductForm(request.POST, request.FILES)
-        # Filter category dropdown
         form.fields['category'].queryset = categories_qs
-        
+
         if form.is_valid():
             try:
                 product = form.save(commit=False)
                 product.cafe = my_cafe
-
-                # Default Category Logic
                 if not product.category:
-                     product.category = categories_qs.first()
-
+                    product.category = categories_qs.first()
                 product.save()
                 invalidate_products_cache()
-                messages.success(request, f"✅ Product {product.name} added!")
+                messages.success(request, f"تم إضافة المنتج {product.name} بنجاح.")
                 return redirect('core:products')
-            except Exception as e:
-                messages.error(request, f"Database Error: {e}")
+            except Exception as exc:
+                messages.error(request, f"حدث خطأ أثناء الحفظ: {exc}")
         else:
-             messages.error(request, "يرجى التحقق من البيانات المدخلة.")
+            messages.error(request, "تعذر إضافة المنتج. تأكد من البيانات.")
 
     return redirect('core:products')
 
@@ -608,16 +699,25 @@ def edit_product(request, product_id):
         if form.is_valid():
             try:
                 updated_product = form.save(commit=False)
-                updated_product.cafe = my_cafe # Ensure ownership
-                
+                updated_product.cafe = my_cafe
                 updated_product.save()
                 invalidate_products_cache()
-                messages.success(request, "✅ تم التعديل بنجاح")
+                messages.success(request, "تم تحديث بيانات المنتج بنجاح.")
                 return redirect('core:products')
-            except Exception as e:
-                messages.error(request, f"Error: {e}")
+            except Exception as exc:
+                messages.error(request, f"حدث خطأ أثناء التحديث: {exc}")
+        else:
+            messages.error(request, "تعذر تحديث المنتج. تأكد من البيانات.")
 
-    return redirect('core:products')
+    form = ProductForm(instance=product)
+    form.fields['category'].queryset = categories_qs
+    return render(request, 'core/edit_product.html', {
+        'form': form,
+        'product': product,
+        'categories': categories_qs,
+        'cafe_name': my_cafe.name,
+        'system_settings': get_system_settings(),
+    })
 
 
 @login_required(login_url='core:login')
@@ -656,29 +756,28 @@ def charge_wallet(request):
     try:
         amount = Decimal(amount_raw)
     except Exception:
-        messages.error(request, "المبلغ غير صالح.")
+        messages.error(request, "قيمة الشحن غير صحيحة.")
         return redirect('core:wallet_recharge')
 
-    min_amount = Decimal(str(getattr(settings, 'MIN_CHARGE_AMOUNT', 1.0)))
+    min_amount = Decimal(str(get_system_settings().min_charge_amount))
     wallet = get_object_or_404(Wallet.objects.select_related('user'), id=wallet_id)
 
     if amount < min_amount:
-        messages.error(request, f"الحد الأدنى للشحن هو {min_amount} د.ل")
+        messages.error(request, f"الحد الأدنى للشحن هو {min_amount}.")
         return redirect('core:wallet_recharge')
 
     try:
         with transaction.atomic():
-            # إنشاء معاملة إيداع (المودل سيقوم بزيادة الرصيد تلقائياً)
             Transaction.objects.create(
                 wallet=wallet,
                 amount=amount,
                 transaction_type='DEPOSIT',
                 source='SYSTEM',
-                description=f"شحن من اللوحة بواسطة {request.user}"
+                description=f"شحن من لوحة التحكم بواسطة {request.user}",
             )
-        messages.success(request, f"تم شحن محفظة {wallet.user.full_name} بمبلغ {amount} د.ل")        
-    except Exception as e:
-        messages.error(request, f"تعذر الشحن: {e}")
+        messages.success(request, f"تم شحن محفظة {wallet.user.full_name} بمبلغ {amount}.")
+    except Exception as exc:
+        messages.error(request, f"تعذر الشحن: {exc}")
 
     return redirect('core:wallet_recharge')
 
@@ -694,30 +793,27 @@ def refund_wallet(request):
     try:
         amount = Decimal(amount_raw)
     except Exception:
-        messages.error(request, "المبلغ غير صالح.")
+        messages.error(request, "قيمة الخصم غير صحيحة.")
         return redirect('core:wallet_recharge')
 
     wallet = get_object_or_404(Wallet.objects.select_related('user'), id=wallet_id)
 
     if amount <= 0:
-        messages.error(request, "يجب أن يكون المبلغ أكبر من صفر.")
+        messages.error(request, "قيمة الخصم يجب أن تكون أكبر من صفر.")
         return redirect('core:wallet_recharge')
 
     try:
         with transaction.atomic():
-            # إنشاء معاملة خصم (المودل سيقوم بالتحقق من الرصيد والخصم تلقائياً)
             Transaction.objects.create(
                 wallet=wallet,
                 amount=amount,
                 transaction_type='WITHDRAWAL',
                 source='SYSTEM',
-                description=f"خصم من اللوحة بواسطة {request.user}"
+                description=f"خصم من لوحة التحكم بواسطة {request.user}",
             )
-        messages.success(request, f"تم خصم {amount} د.ل من محفظة {wallet.user.full_name}")
-    except ValueError as e:
-         messages.error(request, str(e)) # لعرض رسالة "الرصيد لا يكفي"
-    except Exception as e:
-        messages.error(request, f"تعذر الخصم: {e}")
+        messages.success(request, f"تم خصم {amount} من محفظة {wallet.user.full_name}.")
+    except Exception as exc:
+        messages.error(request, f"تعذر الخصم: {exc}")
 
     return redirect('core:wallet_recharge')
 
@@ -727,12 +823,11 @@ def accept_order(request, order_id):
     cafe = get_cafe_for_user(request.user)
     if not cafe:
         return redirect('core:orders')
-        
+
     order = get_object_or_404(Order, id=order_id, cafe=cafe)
     if order.status == 'PENDING':
         order.status = 'ACCEPTED'
         order.save(update_fields=['status'])
-    
     return redirect('core:orders')
 
 
@@ -746,7 +841,6 @@ def preparing_order(request, order_id):
     if order.status == 'ACCEPTED':
         order.status = 'PREPARING'
         order.save(update_fields=['status'])
-
     return redirect('core:orders')
 
 
@@ -760,7 +854,6 @@ def ready_order(request, order_id):
     if order.status == 'PREPARING':
         order.status = 'READY'
         order.save(update_fields=['status'])
-    
     return redirect('core:orders')
 
 
