@@ -67,7 +67,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'rating', 'rating_count',
             'category', 'category_name', 'category_id',
             'cafe', 'cafe_name', 'cafe_id',
-            'is_available'
+            'is_available',
         ]
 
     def get_image(self, obj):
@@ -92,11 +92,11 @@ class ProductSerializer(serializers.ModelSerializer):
             count = 5
         elif has_any(['burger', 'برغر', 'برجر']):
             count = 5
-        elif has_any(['dessert', 'sweet', 'حلويات', 'حلوى', 'حلى']):
+        elif has_any(['dessert', 'sweet', 'حلويات', 'حلوى']):
             count = 5
         elif has_any(['coffee', 'قهوة']):
             count = 2
-        elif has_any(['drink', 'drinks', 'juice', 'water', 'مشروب', 'مشروبات', 'عصير', 'ماء', 'مياه']):
+        elif has_any(['drink', 'drinks', 'juice', 'water', 'مشروب', 'مشروبات', 'عصير', 'ماء']):
             count = 5
         else:
             count = 5
@@ -134,5 +134,5 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_number', 'total_price', 'status', 'status_display',
             'payment_method', 'payment_method_display', 'created_at',
-            'cafe_name', 'cafe_id', 'items'
+            'cafe_name', 'cafe_id', 'items',
         ]

@@ -58,6 +58,19 @@ def get_system_settings():
     return SystemSettings.get_solo()
 
 
+def infer_unit_from_name(name):
+    text = (name or '').strip()
+    if not text:
+        return ''
+    if 'دقيق' in text or 'طحين' in text or 'سكر' in text:
+        return 'كجم'
+    if 'زيت' in text:
+        return 'لتر'
+    if 'ماء' in text or 'مشروب' in text or 'عصير' in text:
+        return 'لتر'
+    return ''
+
+
 # =========================================================
 #  SECTION 1: API (MOBILE APP)
 # =========================================================
@@ -497,6 +510,10 @@ def add_inventory_item(request):
         if form.is_valid():
             item = form.save(commit=False)
             item.cafe = cafe
+            if not item.unit:
+                inferred = infer_unit_from_name(item.name)
+                if inferred:
+                    item.unit = inferred
             item.save()
             messages.success(request, "تم إضافة الصنف للمخزون بنجاح.")
         else:
@@ -514,7 +531,12 @@ def edit_inventory_item(request, item_id):
     if request.method == 'POST':
         form = InventoryItemForm(request.POST, instance=item)
         if form.is_valid():
-            form.save()
+            updated_item = form.save(commit=False)
+            if not updated_item.unit:
+                inferred = infer_unit_from_name(updated_item.name)
+                if inferred:
+                    updated_item.unit = inferred
+            updated_item.save()
             messages.success(request, "تم تحديث بيانات المخزون بنجاح.")
             return redirect('core:stock')
         messages.error(request, "تعذر تحديث البيانات. تأكد من الحقول.")

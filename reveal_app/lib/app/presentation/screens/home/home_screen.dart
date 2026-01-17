@@ -121,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           userName = userProfile.fullName;
         });
-      } catch (e) {
+      } catch (_) {
         setState(() => userName = "مستخدم");
       }
 
@@ -196,26 +196,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _categoryKeyFor(ProductModel product) {
     final text = "${product.category} ${product.name}".toLowerCase();
-    if (text.contains('pizza') || text.contains('بيتزا')) {
+    if (text.contains('بيتزا') || text.contains('pizza')) {
       return 'pizza';
     }
-    if (text.contains('burger') || text.contains('برغر') || text.contains('برجر')) {
+    if (text.contains('برغر') || text.contains('برجر') || text.contains('burger')) {
       return 'burger';
     }
-    if (text.contains('dessert') || text.contains('sweet') || text.contains('حلويات') || text.contains('حلو')) {
+    if (text.contains('حلويات') || text.contains('حلوى') || text.contains('dessert') || text.contains('sweet')) {
       return 'dessert';
     }
-    if (text.contains('drink') ||
-        text.contains('coffee') ||
-        text.contains('juice') ||
-        text.contains('مشروب') ||
+    if (text.contains('مشروب') ||
         text.contains('مشروبات') ||
         text.contains('قهوة') ||
         text.contains('عصير') ||
-        text.contains('ماء')) {
+        text.contains('ماء') ||
+        text.contains('drink') ||
+        text.contains('coffee') ||
+        text.contains('juice')) {
       return 'drink';
     }
     return 'other';
+  }
+
+  bool _requiresOptions(ProductModel product) {
+    final key = _categoryKeyFor(product);
+    return key == 'pizza' || key == 'burger';
+  }
+
+  String _buildOptionsString({required bool cheese, required bool harissa}) {
+    final cheeseText = cheese ? 'مع جبن' : 'بدون جبن';
+    final harissaText = harissa ? 'مع هريسة' : 'بدون هريسة';
+    return '$cheeseText، $harissaText';
   }
 
   List<ProductModel> _categoryProducts(String key) {
@@ -250,8 +261,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _showUnavailableMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("المنتج غير متوفر حالياً")),
+    );
+  }
+
   void _showAddToCartSheet(ProductModel product) {
+    if (!product.isAvailable) {
+      _showUnavailableMessage();
+      return;
+    }
+
     int quantity = 1;
+    bool includeCheese = true;
+    bool includeHarissa = false;
+    final showOptions = _requiresOptions(product);
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
@@ -260,13 +286,35 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, setModalState) {
             return Container(
               padding: const EdgeInsets.all(20),
-              height: 250,
+              height: showOptions ? 360 : 250,
               child: Column(
                 children: [
                   Text(product.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   Text("${product.price} د.ل", style: TextStyle(color: tealColor, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  if (showOptions) ...[
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text("خيارات الإضافة", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      value: includeCheese,
+                      activeColor: tealColor,
+                      title: const Text("جبن"),
+                      subtitle: Text(includeCheese ? "مع جبن" : "بدون جبن"),
+                      onChanged: (value) => setModalState(() => includeCheese = value),
+                    ),
+                    SwitchListTile(
+                      value: includeHarissa,
+                      activeColor: orangeColor,
+                      title: const Text("هريسة"),
+                      subtitle: Text(includeHarissa ? "مع هريسة" : "بدون هريسة"),
+                      onChanged: (value) => setModalState(() => includeHarissa = value),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -290,7 +338,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: ElevatedButton.styleFrom(backgroundColor: tealColor, padding: const EdgeInsets.symmetric(vertical: 12)),
                       onPressed: () {
                         try {
-                          context.read<CartProvider>().addItem(product, quantity: quantity);
+                          final options = showOptions
+                              ? _buildOptionsString(cheese: includeCheese, harissa: includeHarissa)
+                              : '';
+                          context.read<CartProvider>().addItem(product, quantity: quantity, options: options);
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text("تمت إضافة $quantity من ${product.name} إلى السلة")),
@@ -314,6 +365,31 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  void _quickAdd(ProductModel product) {
+    if (!product.isAvailable) {
+      _showUnavailableMessage();
+      return;
+    }
+
+    if (_requiresOptions(product)) {
+      _showAddToCartSheet(product);
+      return;
+    }
+
+    try {
+      context.read<CartProvider>().addItem(product);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("تمت إضافة ${product.name} إلى السلة")),
+      );
+    } on MismatchedCollegeException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } catch (e) {
+      debugPrint("Cart Error: $e");
+    }
   }
 
   @override
@@ -397,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? const Center(
                             child: Padding(
                               padding: EdgeInsets.all(40),
-                              child: Text("لا توجد منتجات حالياً"),
+                              child: Text("لا توجد منتجات متاحة حالياً"),
                             ),
                           )
                         : showFilteredGrid
@@ -619,7 +695,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Text(product.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text(
+              product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -628,6 +709,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildProductCard(ProductModel product, {String? categoryKey, int index = 0}) {
     final key = categoryKey ?? _categoryKeyFor(product);
+    final available = product.isAvailable;
+
     return GestureDetector(
       onTap: () => _showAddToCartSheet(product),
       child: Container(
@@ -664,6 +747,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+                  if (!available)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          "غير متوفر",
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -679,23 +778,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text("${product.price} د.ل", style: TextStyle(color: tealColor, fontWeight: FontWeight.bold, fontSize: 14)),
                       InkWell(
-                        onTap: () {
-                          try {
-                            context.read<CartProvider>().addItem(product);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("تمت إضافة ${product.name} إلى السلة")),
-                            );
-                          } on MismatchedCollegeException catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
-                            );
-                          } catch (e) {
-                            debugPrint("Cart Error: $e");
-                          }
-                        },
+                        onTap: () => _quickAdd(product),
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: orangeColor, borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(
+                            color: available ? orangeColor : Colors.grey,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           child: const Icon(Icons.add, color: Colors.white, size: 20),
                         ),
                       ),

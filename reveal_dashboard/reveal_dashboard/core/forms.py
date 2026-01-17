@@ -22,10 +22,11 @@ class ProductForm(forms.ModelForm):
 class InventoryItemForm(forms.ModelForm):
     class Meta:
         model = InventoryItem
-        fields = ['name', 'unit', 'quantity', 'min_quantity', 'notes']
+        fields = ['name', 'unit', 'price', 'quantity', 'min_quantity', 'notes']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'اسم الصنف'}),
             'unit': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'الوحدة (كجم، لتر، قطعة...)'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'min_quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'ملاحظات إضافية'}),

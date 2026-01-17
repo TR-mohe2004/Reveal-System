@@ -44,7 +44,7 @@ class OrderModel {
       createdAt: json['created_at'] ?? DateTime.now().toString(),
       items: (json['items'] as List?)?.map((i) => OrderItem.fromJson(i)).toList() ?? [],
       cafeId: json['cafe_id']?.toString() ?? json['college_id']?.toString(),
-      cafeName: json['cafe_name'] ?? json['college_name'] ?? 'مقهى غير محدد',
+      cafeName: json['cafe_name'] ?? json['college_name'] ?? 'مقهى غير معروف',
       cafeLogo: json['cafe_logo'] ?? json['image_url'],
     );
   }
@@ -52,7 +52,7 @@ class OrderModel {
   DateTime get dateObject {
     try {
       return DateTime.parse(createdAt);
-    } catch (e) {
+    } catch (_) {
       return DateTime.now();
     }
   }
@@ -64,7 +64,7 @@ class OrderModel {
   String get statusText {
     switch (status.toUpperCase()) {
       case 'PENDING':
-        return 'بانتظار الموافقة';
+        return 'قيد انتظار المراجعة';
       case 'ACCEPTED':
         return 'تم قبول طلبك';
       case 'PREPARING':

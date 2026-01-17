@@ -14,7 +14,7 @@ class SmartImageUtil {
     'juice': 'assets/images/drinks.png',
     'water': 'assets/images/drinks.png',
     'حلويات': 'assets/images/dessert.png',
-    'حلو': 'assets/images/dessert.png',
+    'حلوى': 'assets/images/dessert.png',
     'dessert': 'assets/images/dessert.png',
     'cake': 'assets/images/dessert.png',
   };

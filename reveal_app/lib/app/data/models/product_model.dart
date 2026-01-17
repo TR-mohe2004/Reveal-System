@@ -43,13 +43,13 @@ class ProductModel {
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     final image = (json['image_url'] ?? json['image'] ?? json['imageUrl'] ?? '').toString();
 
-    String catName = 'تصنيف غير معروف';
+    String catName = 'فئة غير معروفة';
     String catId = '';
     if (json['category'] is Map) {
-      catName = json['category']['name']?.toString() ?? 'تصنيف غير معروف';
+      catName = json['category']['name']?.toString() ?? 'فئة غير معروفة';
       catId = json['category']['id']?.toString() ?? '';
     } else {
-      catName = (json['category_name'] ?? json['category'] ?? 'تصنيف غير معروف').toString();
+      catName = (json['category_name'] ?? json['category'] ?? 'فئة غير معروفة').toString();
       catId = json['category_id']?.toString() ?? '';
     }
 
@@ -72,7 +72,7 @@ class ProductModel {
       category: catName,
       categoryId: catId,
       cafeId: cfId,
-      cafeName: cfName.isNotEmpty ? cfName : 'مقهى غير محدد',
+      cafeName: cfName.isNotEmpty ? cfName : 'مقهى غير معروف',
       collegeId: clgId,
       collegeName: clgName.isNotEmpty ? clgName : cfName,
       imageVariant: json['image_variant'] is int
@@ -107,11 +107,11 @@ class ProductModel {
     if (text.contains('برغر') || text.contains('برجر') || text.contains('burger') || text.contains('burg')) {
       return _pickVariant(_assetPool('assets/images/burger', 5));
     }
-    if (text.contains('حلويات') || text.contains('حلو') || text.contains('dessert') || text.contains('sweet')) {
+    if (text.contains('حلويات') || text.contains('حلوى') || text.contains('dessert') || text.contains('sweet')) {
       return _pickVariant(_assetPool('assets/images/dessert', 5));
     }
-    if (text.contains('مشروب') ||
-        text.contains('مشروبات') ||
+    if (text.contains('مشروبات') ||
+        text.contains('مشروب') ||
         text.contains('عصير') ||
         text.contains('ماء') ||
         text.contains('drink') ||

@@ -119,6 +119,7 @@ class InventoryItem(models.Model):
     cafe = models.ForeignKey(Cafe, on_delete=models.CASCADE, related_name='inventory_items', verbose_name='المقهى')
     name = models.CharField(max_length=150, verbose_name='اسم الصنف')
     unit = models.CharField(max_length=50, blank=True, default='', verbose_name='الوحدة')
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='سعر الوحدة')
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='الكمية')
     min_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='الحد الأدنى')
     notes = models.TextField(blank=True, default='', verbose_name='ملاحظات')
