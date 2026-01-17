@@ -280,15 +280,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              height: showOptions ? 360 : 250,
-              child: Column(
-                children: [
+        final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+        return SafeArea(
+          top: false,
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   Text(product.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
                   Text("${product.price} د.ل", style: TextStyle(color: tealColor, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -331,7 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -355,13 +359,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           debugPrint("Cart Error: $e");
                         }
                       },
-                      child: const Text("إضافة إلى السلة", style: TextStyle(fontSize: 16)),
+                      child: const Text(
+                        "إضافة إلى السلة",
+                        style: TextStyle(fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   )
-                ],
+                  ],
+                ),
               ),
-            );
-          },
+            },
+          ),
         );
       },
     );
@@ -760,6 +771,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: const Text(
                           "غير متوفر",
                           style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),

@@ -198,67 +198,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
               : SingleChildScrollView(
                   child: Column(
                     children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            height: 200,
-                            width: double.infinity,
-                            decoration: const BoxDecoration(
-                              image: DecorationImage(image: NetworkImage(headerImage), fit: BoxFit.cover),
-                              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
-                            ),
-                          ),
-                          Container(
-                            height: 200,
-                            decoration: BoxDecoration(
-                              color: tealColor.withOpacity(0.7),
-                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-                            ),
-                          ),
-                          const Positioned(
-                            top: 40,
-                            left: 16,
-                            child: Text(
-                              "الملف الشخصي",
-                              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          Positioned(
-                            bottom: -50,
-                            child: Stack(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                                  child: CircleAvatar(
-                                    radius: 60,
-                                    backgroundImage: profileImage,
-                                  ),
+                      SizedBox(
+                        height: 260,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 200,
+                                decoration: const BoxDecoration(
+                                  image: DecorationImage(image: NetworkImage(headerImage), fit: BoxFit.cover),
+                                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
                                 ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: InkWell(
-                                    onTap: _pickImage,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: orangeColor,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 2),
-                                      ),
-                                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                              ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 200,
+                                decoration: BoxDecoration(
+                                  color: tealColor.withOpacity(0.7),
+                                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+                                ),
+                              ),
+                            ),
+                            const Positioned(
+                              top: 40,
+                              left: 16,
+                              child: Text(
+                                "الملف الشخصي",
+                                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                    child: CircleAvatar(
+                                      radius: 60,
+                                      backgroundImage: profileImage,
                                     ),
                                   ),
-                                ),
-                              ],
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: InkWell(
+                                      onTap: _pickImage,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: orangeColor,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                        ),
+                                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 60),
+                      const SizedBox(height: 20),
                       Text(
                         userProfile!.fullName,
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),

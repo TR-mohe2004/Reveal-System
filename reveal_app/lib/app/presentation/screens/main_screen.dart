@@ -25,7 +25,7 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   String _userName = "جاري التحميل...";
   String _userEmail = "";
   String? _userImage;
@@ -41,6 +41,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserData();
     _bellController = AnimationController(
       vsync: this,
@@ -122,7 +123,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   final List<String> _titles = [
     'المحفظة',
     'السلة',
-    'الملف الشخصي',
+    'بروفايل',
     'طلباتي',
     'الرئيسية',
   ];
@@ -174,7 +175,15 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   void dispose() {
     _notificationTimer?.cancel();
     _bellController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshNotifications();
+    }
   }
 
   @override
@@ -257,7 +266,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               children: [
                 _buildBottomNavItem(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'المحفظة', 0),
                 _buildBottomNavItem(Icons.shopping_cart_outlined, Icons.shopping_cart, 'السلة', 1),
-                _buildBottomNavItem(Icons.person_outline, Icons.person, 'الملف الشخصي', 2),
+                _buildBottomNavItem(Icons.person_outline, Icons.person, 'بروفايل', 2),
                 _buildBottomNavItem(Icons.receipt_long_outlined, Icons.receipt_long, 'طلباتي', 3),
                 _buildBottomNavItem(Icons.home_outlined, Icons.home, 'الرئيسية', 4),
               ],
@@ -509,6 +518,9 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   color: isSelected ? tealColor : Colors.grey[600],
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
             ],
           ),

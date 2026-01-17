@@ -53,6 +53,12 @@ class NotificationService {
 
       if (prev == null) {
         statusCache[key] = status;
+        if (status != 'PENDING') {
+          final notification = _buildNotification(order, status);
+          if (notification != null) {
+            items.insert(0, notification);
+          }
+        }
         continue;
       }
 

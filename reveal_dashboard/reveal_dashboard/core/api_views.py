@@ -19,7 +19,7 @@ from .utils import send_real_notification, normalize_libyan_phone
 # ❌ تم حذف firebase_admin لأننا نعتمد على توكن جانغو
 
 # --- Caching Setup (ممتاز، أبقينا عليه) ---
-PRODUCTS_CACHE_KEY = "products:list"
+PRODUCTS_CACHE_KEY = "products:list:v2"
 PRODUCTS_TTL = 1800  # 30 دقيقة
 
 def get_products_cached():
@@ -27,7 +27,7 @@ def get_products_cached():
     if cached:
         return cached
     # جلب المنتجات من قاعدة بيانات SQL
-    products = list(Product.objects.select_related('cafe', 'category').filter(is_available=True).order_by('-created_at'))
+    products = list(Product.objects.select_related('cafe', 'category').order_by('-created_at'))
     cache.set(PRODUCTS_CACHE_KEY, products, PRODUCTS_TTL)
     return products
 

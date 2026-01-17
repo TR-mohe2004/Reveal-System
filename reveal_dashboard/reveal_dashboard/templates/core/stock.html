@@ -6,7 +6,7 @@
     <div>
         <h1 class="h2">المخزون</h1>
         {% if cafe_name %}
-            <p class="text-muted mb-0">مقهى: {{ cafe_name }}</p>
+            <p class="text-muted mb-0">المقهى: {{ cafe_name }}</p>
         {% endif %}
     </div>
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
@@ -27,7 +27,7 @@
                         <th scope="col">الحد الأدنى</th>
                         <th scope="col">ملاحظات</th>
                         <th scope="col">الحالة</th>
-                        <th scope="col">إجراءات</th>
+                        <th scope="col">التحكم</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -41,9 +41,7 @@
                         <td>{{ item.notes|default:"-" }}</td>
                         <td>
                             {% if item.quantity == 0 %}
-                                <span class="badge bg-danger">منتهي</span>
-                            {% elif item.min_quantity and item.quantity <= item.min_quantity %}
-                                <span class="badge bg-warning text-dark">منخفض</span>
+                                <span class="badge bg-danger">غير متوفر</span>
                             {% else %}
                                 <span class="badge bg-success">متوفر</span>
                             {% endif %}
@@ -53,7 +51,7 @@
                                 <i class="fas fa-edit"></i>
                             </a>
                             <a href="{% url 'core:delete_inventory_item' item.id %}" class="btn btn-sm btn-outline-danger" title="حذف"
-                               onclick="return confirm('هل تريد حذف الصنف من المخزون؟');">
+                               onclick="return confirm('هل أنت متأكد من حذف الصنف من المخزون؟');">
                                 <i class="fas fa-trash"></i>
                             </a>
                         </td>
@@ -73,7 +71,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">إضافة صنف للمخزون</h5>
+                <h5 class="modal-title">إضافة صنف مخزون</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="{% url 'core:add_inventory_item' %}" method="POST">
