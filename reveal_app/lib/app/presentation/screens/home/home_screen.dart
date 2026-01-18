@@ -293,81 +293,81 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                  Text(product.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  Text("${product.price} د.ل", style: TextStyle(color: tealColor, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  if (showOptions) ...[
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text("خيارات الإضافة", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      value: includeCheese,
-                      activeColor: tealColor,
-                      title: const Text("جبن"),
-                      subtitle: Text(includeCheese ? "مع جبن" : "بدون جبن"),
-                      onChanged: (value) => setModalState(() => includeCheese = value),
-                    ),
-                    SwitchListTile(
-                      value: includeHarissa,
-                      activeColor: orangeColor,
-                      title: const Text("هريسة"),
-                      subtitle: Text(includeHarissa ? "مع هريسة" : "بدون هريسة"),
-                      onChanged: (value) => setModalState(() => includeHarissa = value),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () {
-                          if (quantity > 1) setModalState(() => quantity--);
-                        },
+                    Text(product.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    Text("${product.price} د.ل", style: TextStyle(color: tealColor, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    if (showOptions) ...[
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text("خيارات الإضافة", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
                       ),
-                      Text("$quantity", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => setModalState(() => quantity++),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        value: includeCheese,
+                        activeColor: tealColor,
+                        title: const Text("جبن"),
+                        subtitle: Text(includeCheese ? "مع جبن" : "بدون جبن"),
+                        onChanged: (value) => setModalState(() => includeCheese = value),
+                      ),
+                      SwitchListTile(
+                        value: includeHarissa,
+                        activeColor: orangeColor,
+                        title: const Text("هريسة"),
+                        subtitle: Text(includeHarissa ? "مع هريسة" : "بدون هريسة"),
+                        onChanged: (value) => setModalState(() => includeHarissa = value),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: tealColor, padding: const EdgeInsets.symmetric(vertical: 12)),
-                      onPressed: () {
-                        try {
-                          final options = showOptions
-                              ? _buildOptionsString(cheese: includeCheese, harissa: includeHarissa)
-                              : '';
-                          context.read<CartProvider>().addItem(product, quantity: quantity, options: options);
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("تمت إضافة $quantity من ${product.name} إلى السلة")),
-                          );
-                        } on MismatchedCollegeException catch (e) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(e.toString())),
-                          );
-                        } catch (e) {
-                          debugPrint("Cart Error: $e");
-                        }
-                      },
-                      child: const Text(
-                        "إضافة إلى السلة",
-                        style: TextStyle(fontSize: 16),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline),
+                          onPressed: () {
+                            if (quantity > 1) setModalState(() => quantity--);
+                          },
+                        ),
+                        Text("$quantity", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline),
+                          onPressed: () => setModalState(() => quantity++),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: tealColor, padding: const EdgeInsets.symmetric(vertical: 12)),
+                        onPressed: () {
+                          try {
+                            final options = showOptions
+                                ? _buildOptionsString(cheese: includeCheese, harissa: includeHarissa)
+                                : '';
+                            context.read<CartProvider>().addItem(product, quantity: quantity, options: options);
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("تمت إضافة $quantity من ${product.name} إلى السلة")),
+                            );
+                          } on MismatchedCollegeException catch (e) {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          } catch (e) {
+                            debugPrint("Cart Error: $e");
+                          }
+                        },
+                        child: const Text(
+                          "إضافة إلى السلة",
+                          style: TextStyle(fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  )
                   ],
                 ),
               ),

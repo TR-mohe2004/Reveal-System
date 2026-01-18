@@ -250,7 +250,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Positioned(
                                     bottom: 0,
                                     right: 0,
-                                    child: InkWell(
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
                                       onTap: _pickImage,
                                       child: Container(
                                         padding: const EdgeInsets.all(8),
